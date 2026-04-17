@@ -9,7 +9,8 @@ def add_schedule(schedule: Schedule) -> int:
         cur = conn.execute(
             """INSERT INTO schedules
                (device_id, task_description, next_due_date, frequency_days)
-               VALUES (?,?,?,?)""",
+               VALUES (%s,%s,%s,%s)
+               RETURNING id""",
             (
                 schedule.device_id,
                 schedule.task_description,
@@ -17,7 +18,7 @@ def add_schedule(schedule: Schedule) -> int:
                 schedule.frequency_days,
             ),
         )
-        return cur.lastrowid
+        return cur.fetchone()["id"]
 
 
 def get_schedule(schedule_id: int) -> Optional[Schedule]:
@@ -25,7 +26,7 @@ def get_schedule(schedule_id: int) -> Optional[Schedule]:
         row = conn.execute(
             """SELECT s.*, d.name as device_name
                FROM schedules s JOIN devices d ON s.device_id = d.id
-               WHERE s.id = ?""",
+               WHERE s.id = %s""",
             (schedule_id,),
         ).fetchone()
     return Schedule.from_row(row) if row else None
@@ -40,7 +41,7 @@ def list_schedules(device_id: Optional[int] = None, active_only: bool = True) ->
         if active_only:
             query += " AND s.is_active = 1"
         if device_id:
-            query += " AND s.device_id = ?"
+            query += " AND s.device_id = %s"
             params.append(device_id)
         query += " ORDER BY s.next_due_date"
         rows = conn.execute(query, params).fetchall()
@@ -53,7 +54,7 @@ def get_due_schedules(days_ahead: int = 7) -> list[Schedule]:
         rows = conn.execute(
             """SELECT s.*, d.name as device_name
                FROM schedules s JOIN devices d ON s.device_id = d.id
-               WHERE s.is_active = 1 AND s.next_due_date <= ?
+               WHERE s.is_active = 1 AND s.next_due_date <= %s
                ORDER BY s.next_due_date""",
             (cutoff,),
         ).fetchall()
@@ -69,7 +70,7 @@ def advance_schedule(schedule_id: int) -> str:
     new_due = (due + timedelta(days=schedule.frequency_days)).isoformat()
     with get_connection() as conn:
         conn.execute(
-            "UPDATE schedules SET next_due_date = ? WHERE id = ?",
+            "UPDATE schedules SET next_due_date = %s WHERE id = %s",
             (new_due, schedule_id),
         )
     return new_due
@@ -78,7 +79,7 @@ def advance_schedule(schedule_id: int) -> str:
 def set_calendar_event_id(schedule_id: int, event_id: str) -> None:
     with get_connection() as conn:
         conn.execute(
-            "UPDATE schedules SET calendar_event_id = ? WHERE id = ?",
+            "UPDATE schedules SET calendar_event_id = %s WHERE id = %s",
             (event_id, schedule_id),
         )
 
@@ -87,8 +88,8 @@ def update_schedule(schedule: Schedule) -> None:
     with get_connection() as conn:
         conn.execute(
             """UPDATE schedules SET
-               task_description=?, next_due_date=?, frequency_days=?, is_active=?
-               WHERE id=?""",
+               task_description=%s, next_due_date=%s, frequency_days=%s, is_active=%s
+               WHERE id=%s""",
             (schedule.task_description, schedule.next_due_date,
              schedule.frequency_days, int(schedule.is_active), schedule.id),
         )
@@ -96,12 +97,12 @@ def update_schedule(schedule: Schedule) -> None:
 
 def delete_schedule(schedule_id: int) -> None:
     with get_connection() as conn:
-        conn.execute("DELETE FROM schedules WHERE id = ?", (schedule_id,))
+        conn.execute("DELETE FROM schedules WHERE id = %s", (schedule_id,))
 
 
 def deactivate_schedule(schedule_id: int) -> None:
     with get_connection() as conn:
-        conn.execute("UPDATE schedules SET is_active = 0 WHERE id = ?", (schedule_id,))
+        conn.execute("UPDATE schedules SET is_active = 0 WHERE id = %s", (schedule_id,))
 
 
 def days_until_due(next_due_date: str) -> int:

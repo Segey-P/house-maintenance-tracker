@@ -11,7 +11,8 @@ def add_device(device: Device) -> int:
                (name, category, model, serial_number, part_numbers,
                 maintenance_frequency_days, resource_links,
                 purchase_date, warranty_expiry, notes)
-               VALUES (?,?,?,?,?,?,?,?,?,?)""",
+               VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+               RETURNING id""",
             (
                 device.name,
                 device.category,
@@ -25,12 +26,12 @@ def add_device(device: Device) -> int:
                 device.notes,
             ),
         )
-        return cur.lastrowid
+        return cur.fetchone()["id"]
 
 
 def get_device(device_id: int) -> Optional[Device]:
     with get_connection() as conn:
-        row = conn.execute("SELECT * FROM devices WHERE id = ?", (device_id,)).fetchone()
+        row = conn.execute("SELECT * FROM devices WHERE id = %s", (device_id,)).fetchone()
     return Device.from_row(row) if row else None
 
 
@@ -41,7 +42,7 @@ def list_devices(category: Optional[str] = None, include_archived: bool = False)
         if not include_archived:
             query += " AND is_archived = 0"
         if category:
-            query += " AND category = ?"
+            query += " AND category = %s"
             params.append(category)
         query += " ORDER BY category, name"
         rows = conn.execute(query, params).fetchall()
@@ -52,10 +53,10 @@ def update_device(device: Device) -> None:
     with get_connection() as conn:
         conn.execute(
             """UPDATE devices SET
-               name=?, category=?, model=?, serial_number=?, part_numbers=?,
-               maintenance_frequency_days=?, resource_links=?,
-               purchase_date=?, warranty_expiry=?, notes=?, is_archived=?
-               WHERE id=?""",
+               name=%s, category=%s, model=%s, serial_number=%s, part_numbers=%s,
+               maintenance_frequency_days=%s, resource_links=%s,
+               purchase_date=%s, warranty_expiry=%s, notes=%s, is_archived=%s
+               WHERE id=%s""",
             (
                 device.name,
                 device.category,
@@ -75,14 +76,14 @@ def update_device(device: Device) -> None:
 
 def delete_device(device_id: int) -> None:
     with get_connection() as conn:
-        conn.execute("DELETE FROM devices WHERE id = ?", (device_id,))
+        conn.execute("DELETE FROM devices WHERE id = %s", (device_id,))
 
 
 def archive_device(device_id: int) -> None:
     with get_connection() as conn:
-        conn.execute("UPDATE devices SET is_archived = 1 WHERE id = ?", (device_id,))
+        conn.execute("UPDATE devices SET is_archived = 1 WHERE id = %s", (device_id,))
 
 
 def unarchive_device(device_id: int) -> None:
     with get_connection() as conn:
-        conn.execute("UPDATE devices SET is_archived = 0 WHERE id = ?", (device_id,))
+        conn.execute("UPDATE devices SET is_archived = 0 WHERE id = %s", (device_id,))

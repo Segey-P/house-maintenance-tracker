@@ -35,7 +35,7 @@ class Device:
             warranty_expiry=row["warranty_expiry"],
             notes=row["notes"],
             is_archived=bool(row["is_archived"]) if "is_archived" in keys else False,
-            created_at=row["created_at"],
+            created_at=str(row["created_at"]) if row.get("created_at") else None,
         )
 
 
@@ -61,7 +61,7 @@ class MaintenanceLog:
             cost_cad=row["cost_cad"] or 0.0,
             sourcing_info=row["sourcing_info"],
             notes=row["notes"],
-            created_at=row["created_at"],
+            created_at=str(row["created_at"]) if row.get("created_at") else None,
             device_name=row["device_name"] if "device_name" in row.keys() else None,
         )
 
@@ -88,6 +88,6 @@ class Schedule:
             frequency_days=row["frequency_days"],
             calendar_event_id=row["calendar_event_id"],
             is_active=bool(row["is_active"]),
-            created_at=row["created_at"],
+            created_at=str(row["created_at"]) if row.get("created_at") else None,
             device_name=row["device_name"] if "device_name" in row.keys() else None,
         )
