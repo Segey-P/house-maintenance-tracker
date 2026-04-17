@@ -37,7 +37,7 @@ class _Conn:
 
 
 def get_connection() -> _Conn:
-    return _Conn(psycopg2.connect(_db_url()))
+    return _Conn(psycopg2.connect(_db_url(), sslmode="require"))
 
 
 def init_db() -> None:
