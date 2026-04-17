@@ -1,12 +1,3 @@
-"""Password gate — same pattern as project-management-hub.
-
-To protect the app, add this at the very top of app.py:
-
-    from utils.auth import require_password, logout_button
-    require_password()
-
-And call logout_button() somewhere in the sidebar.
-"""
 import bcrypt
 import streamlit as st
 
@@ -16,18 +7,24 @@ def require_password() -> bool:
         return True
 
     st.title("House Maintenance Tracker")
-    st.caption("Enter password to continue.")
 
-    pw = st.text_input("Password", type="password", label_visibility="collapsed")
+    with st.form("login_form"):
+        pw = st.text_input("Password", type="password", placeholder="Enter password")
+        submitted = st.form_submit_button("Sign in", type="primary", use_container_width=True)
+
+    if not submitted:
+        st.stop()
+
     if not pw:
+        st.error("Please enter a password.")
         st.stop()
 
-    stored = st.secrets.get("password_hash", "").encode()
-    if not stored:
-        st.error("No password hash configured in secrets. See README.")
+    stored_raw = st.secrets.get("password_hash", "").strip()
+    if not stored_raw:
+        st.error("No password hash configured in secrets.")
         st.stop()
 
-    if bcrypt.checkpw(pw.encode(), stored):
+    if bcrypt.checkpw(pw.encode(), stored_raw.encode()):
         st.session_state["authenticated"] = True
         st.rerun()
     else:
