@@ -3,13 +3,20 @@ import psycopg2.extras
 import streamlit as st
 
 
-def _db_url() -> str:
+def _db_params() -> dict:
     try:
-        return st.secrets["database"]["url"]
+        db = st.secrets["database"]
+        return dict(
+            host=db["host"],
+            port=int(db.get("port", 5432)),
+            dbname=db.get("dbname", "postgres"),
+            user=db["user"],
+            password=db["password"],
+            sslmode="require",
+        )
     except Exception:
         raise RuntimeError(
-            "Database not configured. "
-            "Add [database]\nurl = '...' to .streamlit/secrets.toml"
+            "Database not configured. Add [database] section to .streamlit/secrets.toml"
         )
 
 
@@ -37,7 +44,7 @@ class _Conn:
 
 
 def get_connection() -> _Conn:
-    return _Conn(psycopg2.connect(_db_url(), sslmode="require"))
+    return _Conn(psycopg2.connect(**_db_params()))
 
 
 def init_db() -> None:
