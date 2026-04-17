@@ -1,5 +1,7 @@
 # Module 2: Maintenance History Ledger
 
+**Status:** Active — full CRUD implemented in `src/history.py`; Web UI in History tab; per-device and global spend totals functional.
+
 ## 1. Objective
 
 Maintain a complete historical record of all maintenance activities for budgeting, warranty verification, and future reference. All records are manageable via both the Web UI and CLI.

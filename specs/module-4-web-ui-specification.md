@@ -1,5 +1,7 @@
 # Module 4: Web UI Specification
 
+**Status:** Active — all five tabs implemented in `app.py` (Dashboard, Inventory, History, Schedules, Notifications). bcrypt password gate via `utils/auth.py` + `st.secrets`. Open gap: SQLite DB uses local filesystem path (`data/house_maintenance.db`) which is ephemeral on Streamlit Cloud — commit the DB file to the repo or migrate to a hosted backend for persistent cloud data.
+
 ## 1. Objective
 
 Provide a browser-based interface for managing all aspects of the House Maintenance Tracker without requiring CLI access.

@@ -1,5 +1,6 @@
 """Google Calendar and Gmail notification integration."""
 import base64
+import html as _html
 import json
 from datetime import date, timedelta
 from email.mime.multipart import MIMEMultipart
@@ -42,8 +43,25 @@ def _gmail_service():
 
 
 def _load_settings() -> dict:
+    """Load settings from st.secrets (cloud) or config/settings.json (local)."""
+    try:
+        import streamlit as st
+        secrets = st.secrets
+        result = {}
+        if "user_email" in secrets:
+            result["user_email"] = secrets["user_email"]
+        if "calendar_id" in secrets:
+            result["calendar_id"] = secrets["calendar_id"]
+        if "timezone" in secrets:
+            result["timezone"] = secrets["timezone"]
+        if result:
+            return result
+    except Exception:
+        pass
     settings_path = Path(__file__).parent.parent / "config" / "settings.json"
-    return json.loads(settings_path.read_text())
+    if settings_path.exists():
+        return json.loads(settings_path.read_text())
+    return {}
 
 
 def create_calendar_event(
@@ -121,8 +139,10 @@ def send_email_alert(
     if not recipient:
         raise ValueError("user_email not set in config/settings.json")
 
+    e = _html.escape
+
     parts_html = (
-        "<ul>" + "".join(f"<li>{p}</li>" for p in part_numbers) + "</ul>"
+        "<ul>" + "".join(f"<li>{e(p)}</li>" for p in part_numbers) + "</ul>"
         if part_numbers
         else "<p>See device profile for part details.</p>"
     )
@@ -139,24 +159,34 @@ def send_email_alert(
         else f"Due in {days_left} day(s)"
     )
 
+    purchase_block = (
+        f"<h3>Purchase Link</h3><p><a href='{e(purchase)}'>{e(purchase)}</a></p>"
+        if purchase else ""
+    )
+    tutorial_block = (
+        f"<h3>Tutorial</h3><p><a href='{e(tutorial)}'>{e(tutorial)}</a></p>"
+        if tutorial else ""
+    )
+    notes_block = f"<h3>Notes</h3><p>{e(notes)}</p>" if notes else ""
+
     html = f"""
     <html><body style="font-family:Arial,sans-serif;max-width:600px;margin:auto">
     <h2 style="color:#2c5282">🔧 House Maintenance Reminder</h2>
     <table style="width:100%;border-collapse:collapse">
       <tr><td style="padding:8px;background:#edf2f7;font-weight:bold">Device</td>
-          <td style="padding:8px">{device_name}</td></tr>
+          <td style="padding:8px">{e(device_name)}</td></tr>
       <tr><td style="padding:8px;background:#edf2f7;font-weight:bold">Category</td>
-          <td style="padding:8px">{category}</td></tr>
+          <td style="padding:8px">{e(category)}</td></tr>
       <tr><td style="padding:8px;background:#edf2f7;font-weight:bold">Task</td>
-          <td style="padding:8px">{task_description}</td></tr>
+          <td style="padding:8px">{e(task_description)}</td></tr>
       <tr><td style="padding:8px;background:#edf2f7;font-weight:bold">Due Date</td>
-          <td style="padding:8px">{due_date} &nbsp; {due_label}</td></tr>
+          <td style="padding:8px">{e(due_date)} &nbsp; {due_label}</td></tr>
     </table>
     <h3>Required Parts</h3>
     {parts_html}
-    {"<h3>Purchase Link</h3><p><a href='" + purchase + "'>" + purchase + "</a></p>" if purchase else ""}
-    {"<h3>Tutorial</h3><p><a href='" + tutorial + "'>" + tutorial + "</a></p>" if tutorial else ""}
-    {"<h3>Notes</h3><p>" + notes + "</p>" if notes else ""}
+    {purchase_block}
+    {tutorial_block}
+    {notes_block}
     <hr>
     <p style="color:#718096;font-size:12px">House Maintenance Tracker &mdash; Squamish, BC</p>
     </body></html>

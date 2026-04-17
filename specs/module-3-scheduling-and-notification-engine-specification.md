@@ -1,5 +1,7 @@
 # Module 3: Scheduling and Notification Engine
 
+**Status:** Active — schedule CRUD in `src/scheduler.py`; Google Calendar push and Gmail alerts in `src/notifications.py`; Web UI in Schedules and Notifications tabs. Google OAuth token must be provisioned via `setup_auth.py` before notifications will work; token is not persisted on Streamlit Cloud (local use only for notifications until secrets-based token storage is added).
+
 ## 1. Objective
 
 Automate maintenance interval tracking and deliver timely reminders via Google Calendar and Gmail. Schedules are fully manageable through both the Web UI and CLI.
