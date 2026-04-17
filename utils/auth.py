@@ -8,9 +8,11 @@ def require_password() -> bool:
 
     st.title("House Maintenance Tracker")
 
-    with st.form("login_form"):
-        pw = st.text_input("Password", type="password", placeholder="Enter password")
-        submitted = st.form_submit_button("Sign in", type="primary", use_container_width=True)
+    _, col, _ = st.columns([2, 1, 2])
+    with col:
+        with st.form("login_form"):
+            pw = st.text_input("Password", type="password", placeholder="Enter password")
+            submitted = st.form_submit_button("Sign in", type="primary", use_container_width=True)
 
     if not submitted:
         st.stop()
