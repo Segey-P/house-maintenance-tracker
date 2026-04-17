@@ -14,6 +14,7 @@ from src import history as hist
 from src import scheduler as sched
 from src.models import Device, MaintenanceLog, Schedule
 from src.scheduler import days_until_due
+from utils.auth import require_password, logout_button
 
 CATEGORIES = ["Major Appliances", "Laundry Systems", "Plumbing & Water", "Safety & Electrical"]
 FREQ_ALIASES = {7: "Weekly", 14: "Bi-weekly", 30: "Monthly", 60: "Every 2 months",
@@ -27,6 +28,8 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
+
+require_password()
 
 st.markdown("""
 <style>
@@ -156,6 +159,9 @@ with st.sidebar:
             d = days_until_due(s.next_due_date)
             label = "today" if d == 0 else f"in {d}d"
             st.markdown(f"• {s.device_name} · {label}")
+
+    st.divider()
+    logout_button()
 
 # ── Tabs ──────────────────────────────────────────────────────────────────────
 
