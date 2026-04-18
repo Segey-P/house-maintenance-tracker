@@ -4,28 +4,13 @@ from .db import get_connection
 from .models import Schedule
 
 
-def add_schedule(schedule: Schedule) -> int:
-    with get_connection() as conn:
-        cur = conn.execute(
-            """INSERT INTO schedules
-               (device_id, task_description, next_due_date, frequency_days)
-               VALUES (%s,%s,%s,%s)
-               RETURNING id""",
-            (
-                schedule.device_id,
-                schedule.task_description,
-                schedule.next_due_date,
-                schedule.frequency_days,
-            ),
-        )
-        return cur.fetchone()["id"]
-
-
 def get_schedule(schedule_id: int) -> Optional[Schedule]:
     with get_connection() as conn:
         row = conn.execute(
-            """SELECT s.*, d.name as device_name
-               FROM schedules s JOIN devices d ON s.device_id = d.id
+            """SELECT s.*, d.name as device_name, st.name as service_type_name
+               FROM schedules s
+               JOIN devices d ON s.device_id = d.id
+               LEFT JOIN service_types st ON s.service_type_id = st.id
                WHERE s.id = %s""",
             (schedule_id,),
         ).fetchone()
@@ -34,8 +19,10 @@ def get_schedule(schedule_id: int) -> Optional[Schedule]:
 
 def list_schedules(device_id: Optional[int] = None, active_only: bool = True) -> list[Schedule]:
     with get_connection() as conn:
-        query = """SELECT s.*, d.name as device_name
-                   FROM schedules s JOIN devices d ON s.device_id = d.id
+        query = """SELECT s.*, d.name as device_name, st.name as service_type_name
+                   FROM schedules s
+                   JOIN devices d ON s.device_id = d.id
+                   LEFT JOIN service_types st ON s.service_type_id = st.id
                    WHERE 1=1"""
         params: list = []
         if active_only:
@@ -52,8 +39,10 @@ def get_due_schedules(days_ahead: int = 7) -> list[Schedule]:
     cutoff = (date.today() + timedelta(days=days_ahead)).isoformat()
     with get_connection() as conn:
         rows = conn.execute(
-            """SELECT s.*, d.name as device_name
-               FROM schedules s JOIN devices d ON s.device_id = d.id
+            """SELECT s.*, d.name as device_name, st.name as service_type_name
+               FROM schedules s
+               JOIN devices d ON s.device_id = d.id
+               LEFT JOIN service_types st ON s.service_type_id = st.id
                WHERE s.is_active = 1 AND s.next_due_date <= %s
                ORDER BY s.next_due_date""",
             (cutoff,),
@@ -62,7 +51,6 @@ def get_due_schedules(days_ahead: int = 7) -> list[Schedule]:
 
 
 def advance_schedule(schedule_id: int) -> str:
-    """Bump next_due_date by frequency_days and return the new date."""
     schedule = get_schedule(schedule_id)
     if not schedule:
         raise ValueError(f"Schedule {schedule_id} not found")

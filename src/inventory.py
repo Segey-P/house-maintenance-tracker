@@ -1,4 +1,3 @@
-import json
 from typing import Optional
 from .db import get_connection
 from .models import Device
@@ -8,19 +7,14 @@ def add_device(device: Device) -> int:
     with get_connection() as conn:
         cur = conn.execute(
             """INSERT INTO devices
-               (name, category, model, serial_number, part_numbers,
-                maintenance_frequency_days, resource_links,
-                purchase_date, warranty_expiry, notes)
-               VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+               (name, category, model, serial_number, purchase_date, warranty_expiry, notes)
+               VALUES (%s,%s,%s,%s,%s,%s,%s)
                RETURNING id""",
             (
                 device.name,
                 device.category,
                 device.model,
                 device.serial_number,
-                json.dumps(device.part_numbers),
-                device.maintenance_frequency_days,
-                json.dumps(device.resource_links),
                 device.purchase_date,
                 device.warranty_expiry,
                 device.notes,
@@ -53,8 +47,7 @@ def update_device(device: Device) -> None:
     with get_connection() as conn:
         conn.execute(
             """UPDATE devices SET
-               name=%s, category=%s, model=%s, serial_number=%s, part_numbers=%s,
-               maintenance_frequency_days=%s, resource_links=%s,
+               name=%s, category=%s, model=%s, serial_number=%s,
                purchase_date=%s, warranty_expiry=%s, notes=%s, is_archived=%s
                WHERE id=%s""",
             (
@@ -62,9 +55,6 @@ def update_device(device: Device) -> None:
                 device.category,
                 device.model,
                 device.serial_number,
-                json.dumps(device.part_numbers),
-                device.maintenance_frequency_days,
-                json.dumps(device.resource_links),
                 device.purchase_date,
                 device.warranty_expiry,
                 device.notes,
