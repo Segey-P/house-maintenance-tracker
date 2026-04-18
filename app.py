@@ -413,7 +413,7 @@ with tabs[1]:
                 if not d_name:
                     st.error("Device name is required.")
                 else:
-                    inv.add_device(Device(
+                    new_id = inv.add_device(Device(
                         name=d_name, category=d_cat,
                         model=d_model or None, serial_number=d_serial or None,
                         purchase_date=str(d_pdate) if d_pdate else None,
@@ -421,11 +421,18 @@ with tabs[1]:
                         notes=d_notes or None,
                     ))
                     st.session_state.show_inv_add = False
-                    st.toast("Device added. Open it to add service types.", icon="✅")
+                    st.session_state["open_device_id"] = new_id
                     st.rerun()
             if cancelled:
                 st.session_state.show_inv_add = False
                 st.rerun()
+
+    # Auto-open dialog for a freshly created device so user can add service types immediately
+    _open_id = st.session_state.pop("open_device_id", None)
+    if _open_id:
+        _new_dev = inv.get_device(_open_id)
+        if _new_dev:
+            _device_dialog(_new_dev)
 
     # Filters
     f1, f2 = st.columns([4, 1])
