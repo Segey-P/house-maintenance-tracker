@@ -101,6 +101,61 @@ def _style_schedule(df: pd.DataFrame):
         return [""] * len(row)
     return df.style.apply(row_bg, axis=1)
 
+# ── Log-entry dialog ──────────────────────────────────────────────────────────
+
+@st.dialog("Log Entry", width="large")
+def _log_dialog(log: MaintenanceLog):
+    st.markdown(f"### {log.device_name}")
+    meta = log.completion_date
+    if log.service_type_name:
+        meta += f"  ·  {log.service_type_name}"
+    st.caption(meta)
+
+    dm1, dm2 = st.columns(2)
+    dm1.metric("Cost", _money(log.cost_cad))
+    dm2.metric("Task", log.task_performed[:40] + ("…" if len(log.task_performed) > 40 else ""))
+    st.divider()
+
+    dev_stypes = svcs.list_service_types(log.device_id)
+    svc_map = {"— none / manual —": None} | {s.name: s.id for s in dev_stypes}
+    svc_keys = list(svc_map.keys())
+    cur_svc_idx = 0
+    for i, (k, v) in enumerate(svc_map.items()):
+        if v == log.service_type_id:
+            cur_svc_idx = i
+            break
+
+    with st.form("edit_log_dlg_form"):
+        el_svc  = st.selectbox("Service type", svc_keys, index=cur_svc_idx)
+        ela1, ela2 = st.columns(2)
+        el_task = ela1.text_input("Task performed", value=log.task_performed)
+        try:    el_date_val = date.fromisoformat(log.completion_date)
+        except: el_date_val = date.today()
+        el_date = ela2.date_input("Completion date", value=el_date_val)
+        elb1, elb2 = st.columns(2)
+        el_cost = elb1.number_input("Cost (CAD)", min_value=0.0,
+                                    value=float(log.cost_cad), step=0.01, format="%.2f")
+        el_src  = elb2.text_input("Sourcing", value=log.sourcing_info or "")
+        el_notes = st.text_area("Notes", value=log.notes or "", height=60)
+
+        if st.form_submit_button("Save Changes", type="primary", use_container_width=True):
+            log.service_type_id = svc_map[el_svc]
+            log.task_performed  = el_task
+            log.completion_date = str(el_date)
+            log.cost_cad        = float(el_cost)
+            log.sourcing_info   = el_src or None
+            log.notes           = el_notes or None
+            hist.update_log(log)
+            st.toast("Entry updated.", icon="✅")
+            st.rerun()
+
+    st.divider()
+    ga1, ga2, ga3 = st.columns([1, 1, 3])
+    with ga1:
+        if st.button("Delete", type="secondary", key=f"ldlg_del_{log.id}", use_container_width=True):
+            _delete_dialog(f"{log.completion_date} · {log.task_performed}", "log", log.id)
+
+
 # ── Schedule dialog ───────────────────────────────────────────────────────────
 
 @st.dialog("Schedule Details", width="large")
@@ -291,9 +346,17 @@ def _device_dialog(device: Device):
     st.markdown(f"### {device.name}")
     st.caption(device.category + (" · Archived" if device.is_archived else ""))
 
-    dm1, dm2 = st.columns(2)
+    recent_logs = hist.list_logs(device_id=device.id, limit=10)
+    last_svc = recent_logs[0] if recent_logs else None
+
+    dm1, dm2, dm3 = st.columns(3)
     dm1.metric("Total Spend", _money(hist.total_cost(device.id)))
     dm2.metric("Warranty Expiry", device.warranty_expiry or "—")
+    if last_svc:
+        dm3.metric("Last Service", last_svc.completion_date)
+        dm3.caption(last_svc.service_type_name or last_svc.task_performed[:30])
+    else:
+        dm3.metric("Last Service", "—")
     st.divider()
 
     with st.form("device_detail_form"):
@@ -412,6 +475,28 @@ def _device_dialog(device: Device):
                             st.toast("Service type updated.", icon="✅")
     else:
         st.caption("No service types yet. Add one to define maintenance intervals and parts.")
+
+    # ── Maintenance History ────────────────────────────────────────────────────
+    st.divider()
+    with st.expander(f"🔧 Maintenance History ({len(recent_logs)} recent)"):
+        if recent_logs:
+            h1, h2, h3, h4 = st.columns([1, 3, 2, 1])
+            for col, lbl in zip([h1, h2, h3, h4], ["Date", "Task", "Service Type", "Cost"]):
+                col.markdown(
+                    f"<span style='font-size:0.75rem;text-transform:uppercase;"
+                    f"color:#64748b;font-weight:600;letter-spacing:0.05em'>{lbl}</span>",
+                    unsafe_allow_html=True,
+                )
+            st.markdown("<hr style='margin:4px 0 8px'>", unsafe_allow_html=True)
+            for l in recent_logs:
+                rc = st.columns([1, 3, 2, 1])
+                rc[0].caption(l.completion_date)
+                rc[1].markdown(f"<span style='font-size:0.85rem'>{l.task_performed}</span>",
+                               unsafe_allow_html=True)
+                rc[2].caption(l.service_type_name or "—")
+                rc[3].caption(_money(l.cost_cad) if l.cost_cad else "—")
+        else:
+            st.caption("No maintenance history yet.")
 
     st.divider()
     ga1, ga2, ga3 = st.columns([1, 1, 3])
@@ -533,6 +618,7 @@ with tabs[2]:
                         "device_id": s.device_id,
                         "task": s.task_description,
                         "schedule_id": s.id,
+                        "service_type_id": s.service_type_id,
                     }
                     st.session_state.show_hist_add = True
                     st.rerun()
@@ -547,38 +633,57 @@ with tabs[2]:
         st.divider()
 
     # ── Log Expense form ──────────────────────────────────────────────────────
-    prefill          = st.session_state.get("prefill_log", {})
-    prefill_dev_id   = prefill.get("device_id")
-    prefill_task     = prefill.get("task", "")
-    completing_sched = prefill.get("schedule_id")
+    prefill           = st.session_state.get("prefill_log", {})
+    prefill_dev_id    = prefill.get("device_id")
+    prefill_task      = prefill.get("task", "")
+    prefill_svc_id    = prefill.get("service_type_id")
+    completing_sched  = prefill.get("schedule_id")
 
     if st.session_state.get("show_hist_add"):
         with st.container(border=True):
             header = "**Complete Task**" if completing_sched else "**New Expense Entry**"
             st.markdown(header)
+
+            # Device selector is OUTSIDE the form so service types update reactively
+            log_devs  = inv.list_devices()
+            dev_map   = {f"{d.name}  —  {d.category}": d.id for d in log_devs}
+            dev_keys  = list(dev_map.keys())
+            default_dev_idx = 0
+            if prefill_dev_id:
+                for i, k in enumerate(dev_keys):
+                    if dev_map[k] == prefill_dev_id:
+                        default_dev_idx = i
+                        break
+            log_dev_sel    = st.selectbox("Device *", dev_keys,
+                                          index=default_dev_idx, key="hist_log_device")
+            selected_dev_id = dev_map[log_dev_sel]
+
+            # Service types for the selected device
+            dev_stypes = svcs.list_service_types(selected_dev_id)
+            svc_map    = {"— none / manual —": None} | {s.name: s.id for s in dev_stypes}
+            svc_keys   = list(svc_map.keys())
+            default_svc_idx = 0
+            if prefill_svc_id:
+                for i, (k, v) in enumerate(svc_map.items()):
+                    if v == prefill_svc_id:
+                        default_svc_idx = i
+                        break
+
             with st.form("add_log_form", clear_on_submit=True):
-                log_devs    = inv.list_devices()
-                dev_map     = {f"{d.name}  —  {d.category}": d.id for d in log_devs}
-                dev_keys    = list(dev_map.keys())
-                default_dev = 0
-                if prefill_dev_id:
-                    for i, k in enumerate(dev_keys):
-                        if dev_map[k] == prefill_dev_id:
-                            default_dev = i
-                            break
-                la1, la2    = st.columns(2)
-                log_dev_sel = la1.selectbox("Device *", dev_keys, index=default_dev)
-                log_date    = la2.date_input("Completion date", value=date.today())
-                log_task    = st.text_input("Task performed *", value=prefill_task,
-                                            placeholder="e.g. Replaced furnace filter")
-                lb1, lb2    = st.columns(2)
-                log_cost    = lb1.number_input("Cost (CAD)", min_value=0.0, value=0.0,
-                                               step=0.01, format="%.2f")
+                la1, la2  = st.columns(2)
+                log_svc   = la1.selectbox("Service type", svc_keys, index=default_svc_idx)
+                log_date  = la2.date_input("Completion date", value=date.today())
+                log_task  = st.text_input("Task performed *", value=prefill_task,
+                                          placeholder="e.g. Replaced furnace filter")
+                lb1, lb2  = st.columns(2)
+                log_cost  = lb1.number_input("Cost (CAD)", min_value=0.0, value=0.0,
+                                             step=0.01, format="%.2f")
                 log_sourcing = lb2.text_input("Sourcing", placeholder="Vendor or URL")
-                log_notes   = st.text_area("Notes", height=60,
-                                           placeholder="Installation tips for next time")
-                lc1, lc2    = st.columns(2)
-                l_submitted = lc1.form_submit_button("Save Entry", type="primary", use_container_width=True)
+                log_notes = st.text_area("Notes", height=60,
+                                         placeholder="Installation tips for next time")
+                lc1, lc2  = st.columns(2)
+                l_submitted = lc1.form_submit_button("Save Entry", type="primary",
+                                                     use_container_width=True)
                 l_cancelled = lc2.form_submit_button("Cancel", use_container_width=True)
 
             if l_submitted:
@@ -586,7 +691,8 @@ with tabs[2]:
                     st.error("Task description is required.")
                 else:
                     hist.add_log(MaintenanceLog(
-                        device_id=dev_map[log_dev_sel],
+                        device_id=selected_dev_id,
+                        service_type_id=svc_map[log_svc],
                         task_performed=log_task,
                         completion_date=str(log_date),
                         cost_cad=float(log_cost),
@@ -599,16 +705,18 @@ with tabs[2]:
                     else:
                         st.toast("Expense logged.", icon="✅")
                     st.session_state.pop("prefill_log", None)
+                    st.session_state.pop("hist_log_device", None)
                     st.session_state.show_hist_add = False
                     st.rerun()
             if l_cancelled:
                 st.session_state.pop("prefill_log", None)
+                st.session_state.pop("hist_log_device", None)
                 st.session_state.show_hist_add = False
                 st.rerun()
 
-    # Filters + spend total
+    # ── Log list ──────────────────────────────────────────────────────────────
     all_devs_h   = inv.list_devices(include_archived=True)
-    dev_flt_opts = {"All devices": None} | {f"{d.name}": d.id for d in all_devs_h}
+    dev_flt_opts = {"All devices": None} | {d.name: d.id for d in all_devs_h}
     hf1, hf2, hf3 = st.columns([3, 1, 1])
     dev_flt_sel  = hf1.selectbox("Device", list(dev_flt_opts.keys()),
                                   key="hist_dev_flt", label_visibility="collapsed")
@@ -620,56 +728,38 @@ with tabs[2]:
 
     logs = hist.list_logs(device_id=flt_dev_id, limit=hist_limit)
 
-    if logs:
-        df = pd.DataFrame([
-            {
-                "Date":    l.completion_date,
-                "Device":  l.device_name,
-                "Task":    l.task_performed,
-                "Cost":    _money(l.cost_cad),
-                "Sourcing": l.sourcing_info or "—",
-                "Notes":   l.notes or "—",
-            }
-            for l in logs
-        ])
-        st.dataframe(df, hide_index=True, width=1100)
-    else:
+    if not logs:
         st.info("No entries yet. Log your first maintenance expense above.")
+    else:
+        from collections import defaultdict
+        log_by_device: dict = defaultdict(list)
+        for l in logs:
+            log_by_device[l.device_name].append(l)
 
-    # Edit / Delete
-    with st.expander("✏️ Edit / Delete Entry"):
-        all_logs = hist.list_logs(limit=100)
-        log_opts = {f"{l.completion_date}  ·  {l.device_name}  ·  {l.task_performed}": l
-                    for l in all_logs}
-        sel_log  = st.selectbox("Select entry", ["— select —"] + list(log_opts.keys()),
-                                key="edit_log_sel")
-
-        if sel_log != "— select —":
-            el = log_opts[sel_log]
-            with st.form("edit_log_form"):
-                ela1, ela2 = st.columns(2)
-                el_task    = ela1.text_input("Task performed", value=el.task_performed)
-                try:    el_date_val = date.fromisoformat(el.completion_date)
-                except: el_date_val = date.today()
-                el_date    = ela2.date_input("Completion date", value=el_date_val)
-                elb1, elb2 = st.columns(2)
-                el_cost    = elb1.number_input("Cost (CAD)", min_value=0.0,
-                                               value=float(el.cost_cad), step=0.01, format="%.2f")
-                el_src     = elb2.text_input("Sourcing", value=el.sourcing_info or "")
-                el_notes   = st.text_area("Notes", value=el.notes or "", height=60)
-
-                if st.form_submit_button("Save Changes", type="primary"):
-                    el.task_performed  = el_task
-                    el.completion_date = str(el_date)
-                    el.cost_cad        = float(el_cost)
-                    el.sourcing_info   = el_src or None
-                    el.notes           = el_notes or None
-                    hist.update_log(el)
-                    st.toast("Entry updated.", icon="✅")
-                    st.rerun()
-
-            if st.button("Delete Entry", type="secondary", key="del_log_btn"):
-                _delete_dialog(f"{el.completion_date} · {el.task_performed}", "log", el.id)
+        for dev_name, dev_logs in log_by_device.items():
+            total_dev = sum(l.cost_cad for l in dev_logs)
+            with st.expander(
+                f"**{dev_name}** — {len(dev_logs)} entr{'y' if len(dev_logs) == 1 else 'ies'}"
+                f"  ·  {_money(total_dev)}",
+                expanded=(flt_dev_id is not None),
+            ):
+                hcols = st.columns([1, 3, 2, 1, 1])
+                for col, lbl in zip(hcols, ["Date", "Task", "Service Type", "Cost", ""]):
+                    col.markdown(
+                        f"<span style='font-size:0.75rem;text-transform:uppercase;"
+                        f"color:#64748b;font-weight:600;letter-spacing:0.05em'>{lbl}</span>",
+                        unsafe_allow_html=True,
+                    )
+                st.markdown("<hr style='margin:4px 0 8px'>", unsafe_allow_html=True)
+                for l in dev_logs:
+                    rc = st.columns([1, 3, 2, 1, 1])
+                    rc[0].caption(l.completion_date)
+                    rc[1].markdown(f"<span style='font-size:0.85rem'>{l.task_performed}</span>",
+                                   unsafe_allow_html=True)
+                    rc[2].caption(l.service_type_name or "—")
+                    rc[3].caption(_money(l.cost_cad) if l.cost_cad else "—")
+                    if rc[4].button("Open ↗", key=f"log_open_{l.id}", use_container_width=True):
+                        _log_dialog(l)
 
 
 # ══════════════════════════════════════════════════════════════════════════════

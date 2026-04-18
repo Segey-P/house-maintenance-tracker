@@ -60,10 +60,10 @@ def update_log(log: MaintenanceLog) -> None:
     with get_connection() as conn:
         conn.execute(
             """UPDATE maintenance_log SET
-               task_performed=%s, completion_date=%s, cost_cad=%s,
+               service_type_id=%s, task_performed=%s, completion_date=%s, cost_cad=%s,
                sourcing_info=%s, notes=%s
                WHERE id=%s""",
-            (log.task_performed, log.completion_date, log.cost_cad,
+            (log.service_type_id, log.task_performed, log.completion_date, log.cost_cad,
              log.sourcing_info, log.notes, log.id),
         )
 
