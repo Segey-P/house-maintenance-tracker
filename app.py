@@ -124,7 +124,7 @@ def _delete_dialog(label: str, entity: str, entity_id: int):
 # ── Sidebar ───────────────────────────────────────────────────────────────────
 
 with st.sidebar:
-    st.markdown("## 🏠 Maintenance\nTracker")
+    st.markdown("## 🏠 Squamish Home")
     st.caption(f"📅 {date.today().strftime('%B %d, %Y')}  ·  Squamish, BC")
     st.divider()
 
@@ -163,6 +163,12 @@ with st.sidebar:
 
     st.divider()
     logout_button()
+
+# ── Page header ───────────────────────────────────────────────────────────────
+
+st.markdown("# 🏠 Squamish Home")
+st.caption("House Maintenance Tracker")
+st.divider()
 
 # ── Tabs ──────────────────────────────────────────────────────────────────────
 
@@ -225,7 +231,16 @@ with tabs[0]:
             ])
             st.dataframe(df, hide_index=True, width=680)
         else:
-            st.info("No maintenance history yet. Log your first task in the History tab.")
+            st.info("No maintenance history yet. Log your first task in the Maintenance tab.")
+
+    st.divider()
+    st.subheader("🚧 Coming Soon")
+    st.markdown("""
+- **Download schedule** — export upcoming tasks as a printable checklist
+- **Email alerts** — maintenance reminders sent to your inbox
+- **Google Calendar sync** — push schedules as recurring calendar events
+- **Photo import** — identify appliance from photo, auto-fill specs
+""")
 
 
 
@@ -358,19 +373,21 @@ with tabs[1]:
     )
 
     if devs:
-        # Table header
         hcols = st.columns([3, 2, 2, 1, 1])
         for col, label in zip(hcols, ["Name", "Category", "Interval", "Spend", ""]):
-            col.markdown(f"**{label}**")
-        st.divider()
+            col.markdown(f"<span style='font-size:0.75rem;text-transform:uppercase;color:#64748b;font-weight:600;letter-spacing:0.05em'>{label}</span>", unsafe_allow_html=True)
+        st.markdown("<hr style='margin:4px 0 8px'>", unsafe_allow_html=True)
         for d in devs:
-            rc = st.columns([3, 2, 2, 1, 1])
-            rc[0].write(("🗄 " if d.is_archived else "") + d.name)
-            rc[1].write(d.category)
-            rc[2].write(_freq(d.maintenance_frequency_days) if d.maintenance_frequency_days else "—")
-            rc[3].write(_money(hist.total_cost(d.id)))
-            if rc[4].button("Open ↗", key=f"dev_open_{d.id}", use_container_width=True):
-                _device_dialog(d)
+            with st.container():
+                rc = st.columns([3, 2, 2, 1, 1])
+                name_text = f"{'🗄 ' if d.is_archived else ''}{d.name}"
+                rc[0].markdown(f"**{name_text}**")
+                rc[1].markdown(f"<span style='font-size:0.85rem;color:#475569'>{d.category}</span>", unsafe_allow_html=True)
+                rc[2].markdown(f"<span style='font-size:0.85rem'>{_freq(d.maintenance_frequency_days) if d.maintenance_frequency_days else '—'}</span>", unsafe_allow_html=True)
+                rc[3].markdown(f"<span style='font-size:0.85rem'>{_money(hist.total_cost(d.id))}</span>", unsafe_allow_html=True)
+                if rc[4].button("Open ↗", key=f"dev_open_{d.id}", use_container_width=True):
+                    _device_dialog(d)
+            st.markdown("<hr style='margin:2px 0;border-color:#f1f5f9'>", unsafe_allow_html=True)
     else:
         st.info("No devices found. Add your first device above.")
 
@@ -605,7 +622,7 @@ with tabs[4]:
     st.subheader("Notifications")
 
     # ── Google Calendar ───────────────────────────────────────────────────────
-    cal_col, future_col = st.columns(2)
+    cal_col, _ = st.columns(2)
     with cal_col:
         with st.container(border=True):
             st.markdown("### 🗓 Google Calendar")
@@ -647,16 +664,6 @@ with tabs[4]:
                     st.warning(f"Pushed {pushed}, failed {errors}.")
                 st.rerun()
 
-    # ── Future Features ───────────────────────────────────────────────────────
     # TODO: re-enable password gate before sharing app publicly (utils/auth.py → require_password)
     # TODO: download schedule as a checklist (PDF or CSV export of upcoming tasks)
     # TODO: email alerts — send maintenance reminders to user email
-    with future_col:
-        with st.container(border=True):
-            st.markdown("### 🚧 Coming Soon")
-            st.markdown("""
-- **Download schedule** — export upcoming tasks as a printable checklist
-- **Email alerts** — maintenance reminders sent to your inbox
-- **Google Calendar sync** — push schedules as recurring calendar events
-- **Photo import** — identify appliance from photo, auto-fill specs
-""")
