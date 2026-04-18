@@ -101,6 +101,45 @@ def _style_schedule(df: pd.DataFrame):
         return [""] * len(row)
     return df.style.apply(row_bg, axis=1)
 
+# ── Schedule dialog ───────────────────────────────────────────────────────────
+
+@st.dialog("Schedule Details", width="large")
+def _schedule_dialog(s: Schedule):
+    st.markdown(f"### {s.device_name}  ·  {s.task_description}")
+    st.caption(
+        (f"Service type: {s.service_type_name}  · " if s.service_type_name else "")
+        + ("✅ Active" if s.is_active else "⏸ Paused")
+    )
+
+    dm1, dm2, dm3 = st.columns(3)
+    dm1.metric("Next Due", s.next_due_date)
+    dm2.metric("Status", _status(days_until_due(s.next_due_date)))
+    dm3.metric("Repeats", _freq(s.frequency_days))
+    st.divider()
+
+    with st.form("edit_sched_dlg_form"):
+        es_task = st.text_input("Task description", value=s.task_description)
+        esa1, esa2 = st.columns(2)
+        try:    es_due_val = date.fromisoformat(s.next_due_date)
+        except: es_due_val = date.today()
+        es_due  = esa1.date_input("Next due date", value=es_due_val)
+        es_freq = esa2.number_input("Frequency (days)", min_value=1, value=s.frequency_days)
+
+        if st.form_submit_button("Save Changes", type="primary", use_container_width=True):
+            s.task_description = es_task
+            s.next_due_date    = str(es_due)
+            s.frequency_days   = int(es_freq)
+            sched.update_schedule(s)
+            st.toast("Schedule updated.", icon="✅")
+            st.rerun()
+
+    st.divider()
+    ga1, ga2, ga3 = st.columns([1, 1, 3])
+    with ga1:
+        if st.button("Delete", type="secondary", key=f"sdlg_del_{s.id}", use_container_width=True):
+            _delete_dialog(f"{s.device_name} · {s.task_description}", "schedule", s.id)
+
+
 # ── Delete dialog ─────────────────────────────────────────────────────────────
 
 @st.dialog("Confirm Delete")
@@ -301,35 +340,39 @@ def _device_dialog(device: Device):
             with st.form(f"add_st_form_{device.id}", clear_on_submit=True):
                 st_name  = st.text_input("Service name *", placeholder="e.g. Filter Replacement")
                 sta1, sta2 = st.columns(2)
-                st_freq  = sta1.number_input("Interval (days) *", min_value=1, value=90)
-                st_parts = sta2.text_input("Part numbers", placeholder="Comma-separated")
+                st_freq  = sta1.number_input("Repeat every (days) *", min_value=1, value=90)
+                st_first_due = sta2.date_input("First due date *",
+                                               value=date.today() + timedelta(days=90))
                 stb1, stb2 = st.columns(2)
-                st_tut   = stb1.text_input("Tutorial URL")
-                st_pur   = stb2.text_input("Purchase URL")
-                st_notes = st.text_area("Notes", height=60)
+                st_parts = stb1.text_input("Part numbers", placeholder="Comma-separated")
+                st_tut   = stb2.text_input("Tutorial URL")
                 stc1, stc2 = st.columns(2)
-                st_sub = stc1.form_submit_button("Add Service Type", type="primary", use_container_width=True)
-                st_can = stc2.form_submit_button("Cancel", use_container_width=True)
+                st_pur   = stc1.text_input("Purchase URL")
+                st_notes = stc2.text_area("Notes", height=60)
+                std1, std2 = st.columns(2)
+                st_sub = std1.form_submit_button("Add Service Type", type="primary", use_container_width=True)
+                st_can = std2.form_submit_button("Cancel", use_container_width=True)
 
             if st_sub:
                 if not st_name:
                     st.error("Service name is required.")
                 else:
-                    svcs.add_service_type(ServiceType(
-                        device_id=device.id,
-                        name=st_name,
-                        frequency_days=int(st_freq),
-                        part_numbers=[p.strip() for p in st_parts.split(",") if p.strip()],
-                        tutorial_url=st_tut or None,
-                        purchase_url=st_pur or None,
-                        notes=st_notes or None,
-                    ))
+                    svcs.add_service_type(
+                        ServiceType(
+                            device_id=device.id,
+                            name=st_name,
+                            frequency_days=int(st_freq),
+                            part_numbers=[p.strip() for p in st_parts.split(",") if p.strip()],
+                            tutorial_url=st_tut or None,
+                            purchase_url=st_pur or None,
+                            notes=st_notes or None,
+                        ),
+                        first_due_date=str(st_first_due),
+                    )
                     st.session_state[add_key] = False
                     st.toast("Service type added.", icon="✅")
-                    st.rerun()
             if st_can:
                 st.session_state[add_key] = False
-                st.rerun()
 
     service_types = svcs.list_service_types(device.id)
     if service_types:
@@ -347,7 +390,6 @@ def _device_dialog(device: Device):
                 if s3.button("Delete", key=f"st_del_{stype.id}", type="secondary", use_container_width=True):
                     svcs.delete_service_type(stype.id)
                     st.toast("Service type deleted.", icon="🗑")
-                    st.rerun()
                 if st.session_state.get(edit_key):
                     with st.form(f"edit_st_form_{stype.id}"):
                         e_name  = st.text_input("Name", value=stype.name)
@@ -368,7 +410,6 @@ def _device_dialog(device: Device):
                             svcs.update_service_type(stype)
                             st.session_state[edit_key] = False
                             st.toast("Service type updated.", icon="✅")
-                            st.rerun()
     else:
         st.caption("No service types yet. Add one to define maintenance intervals and parts.")
 
@@ -473,17 +514,63 @@ with tabs[2]:
     hh1.subheader("Maintenance")
     if hh2.button("＋ Log Expense", type="primary", use_container_width=True, key="hist_add_toggle"):
         st.session_state.show_hist_add = not st.session_state.get("show_hist_add", False)
+        st.session_state.pop("prefill_log", None)
+
+    # ── Due Tasks ─────────────────────────────────────────────────────────────
+    action_items = sched.get_due_schedules(days_ahead=7)
+    if action_items:
+        with st.container(border=True):
+            st.markdown("**Due & Overdue Tasks**")
+            for s in action_items:
+                rc1, rc2, rc3, rc4 = st.columns([4, 1, 1, 1])
+                rc1.markdown(
+                    f"**{s.device_name}**  ·  {s.task_description}  ·  "
+                    f"<span style='font-size:0.85rem'>{_status(days_until_due(s.next_due_date))}</span>",
+                    unsafe_allow_html=True,
+                )
+                if rc2.button("✅ Log", key=f"due_log_{s.id}", use_container_width=True):
+                    st.session_state["prefill_log"] = {
+                        "device_id": s.device_id,
+                        "task": s.task_description,
+                        "schedule_id": s.id,
+                    }
+                    st.session_state.show_hist_add = True
+                    st.rerun()
+                if rc3.button("⏭ Skip", key=f"due_skip_{s.id}", use_container_width=True):
+                    new_date = sched.advance_schedule(s.id)
+                    st.toast(f"Skipped — next due {new_date}", icon="⏭")
+                    st.rerun()
+                if rc4.button("⏸ Pause", key=f"due_pause_{s.id}", use_container_width=True):
+                    sched.deactivate_schedule(s.id)
+                    st.toast("Schedule paused. Re-activate from Schedules tab.", icon="⏸")
+                    st.rerun()
+        st.divider()
+
+    # ── Log Expense form ──────────────────────────────────────────────────────
+    prefill          = st.session_state.get("prefill_log", {})
+    prefill_dev_id   = prefill.get("device_id")
+    prefill_task     = prefill.get("task", "")
+    completing_sched = prefill.get("schedule_id")
 
     if st.session_state.get("show_hist_add"):
         with st.container(border=True):
-            st.markdown("**New Expense Entry**")
+            header = "**Complete Task**" if completing_sched else "**New Expense Entry**"
+            st.markdown(header)
             with st.form("add_log_form", clear_on_submit=True):
                 log_devs    = inv.list_devices()
                 dev_map     = {f"{d.name}  —  {d.category}": d.id for d in log_devs}
+                dev_keys    = list(dev_map.keys())
+                default_dev = 0
+                if prefill_dev_id:
+                    for i, k in enumerate(dev_keys):
+                        if dev_map[k] == prefill_dev_id:
+                            default_dev = i
+                            break
                 la1, la2    = st.columns(2)
-                log_dev_sel = la1.selectbox("Device *", list(dev_map.keys()))
+                log_dev_sel = la1.selectbox("Device *", dev_keys, index=default_dev)
                 log_date    = la2.date_input("Completion date", value=date.today())
-                log_task    = st.text_input("Task performed *", placeholder="e.g. Replaced furnace filter")
+                log_task    = st.text_input("Task performed *", value=prefill_task,
+                                            placeholder="e.g. Replaced furnace filter")
                 lb1, lb2    = st.columns(2)
                 log_cost    = lb1.number_input("Cost (CAD)", min_value=0.0, value=0.0,
                                                step=0.01, format="%.2f")
@@ -506,10 +593,16 @@ with tabs[2]:
                         sourcing_info=log_sourcing or None,
                         notes=log_notes or None,
                     ))
+                    if completing_sched:
+                        new_date = sched.advance_schedule(completing_sched)
+                        st.toast(f"Logged and schedule advanced to {new_date}.", icon="✅")
+                    else:
+                        st.toast("Expense logged.", icon="✅")
+                    st.session_state.pop("prefill_log", None)
                     st.session_state.show_hist_add = False
-                    st.toast("Expense logged.", icon="✅")
                     st.rerun()
             if l_cancelled:
+                st.session_state.pop("prefill_log", None)
                 st.session_state.show_hist_add = False
                 st.rerun()
 
@@ -586,12 +679,13 @@ with tabs[2]:
 with tabs[3]:
     sh1, sh2 = st.columns([5, 1])
     sh1.subheader("Maintenance Schedules")
-    if sh2.button("＋ Add Schedule", type="primary", use_container_width=True, key="sched_add_toggle"):
+    if sh2.button("＋ Add Manual", type="secondary", use_container_width=True, key="sched_add_toggle"):
         st.session_state.show_sched_add = not st.session_state.get("show_sched_add", False)
 
     if st.session_state.get("show_sched_add"):
         with st.container(border=True):
-            st.markdown("**New Schedule**")
+            st.markdown("**New Manual Schedule**")
+            st.caption("Schedules are normally created automatically when you add a service type to a device.")
             sched_devs    = inv.list_devices()
             sched_dev_map = {f"{d.name}  —  {d.category}": d for d in sched_devs}
             with st.form("add_sched_form", clear_on_submit=True):
@@ -630,60 +724,47 @@ with tabs[3]:
 
     all_scheds = sched.list_schedules(active_only=not sched_show_all)
 
-    if all_scheds:
-        df = pd.DataFrame([
-            {
-                "Device":   s.device_name,
-                "Task":     s.task_description,
-                "Next Due": s.next_due_date,
-                "Status":   _status(days_until_due(s.next_due_date)),
-                "Repeats":  _freq(s.frequency_days),
-                "Active":   "✅" if s.is_active else "⏸ Paused",
-                "Calendar": "🗓 Linked" if s.calendar_event_id else "Not linked",
-            }
-            for s in all_scheds
-        ])
-        st.dataframe(_style_schedule(df), hide_index=True, width=1100)
+    if not all_scheds:
+        st.info("No schedules yet. Add service types to a device to create schedules automatically.")
     else:
-        st.info("No schedules found.")
+        # Group by device
+        from collections import defaultdict
+        by_device: dict = defaultdict(list)
+        for s in all_scheds:
+            by_device[s.device_name].append(s)
 
-    with st.expander("✏️ Edit / Manage Schedule"):
-        all_s_list = sched.list_schedules(active_only=False)
-        s_opts     = {f"{s.device_name}  ·  {s.task_description}  ({s.next_due_date})": s
-                      for s in all_s_list}
-        sel_s      = st.selectbox("Select schedule", ["— select —"] + list(s_opts.keys()),
-                                  key="edit_s_sel")
-
-        if sel_s != "— select —":
-            es = s_opts[sel_s]
-            with st.form("edit_sched_form"):
-                es_task  = st.text_input("Task description", value=es.task_description)
-                esa1, esa2 = st.columns(2)
-                try:    es_due_val = date.fromisoformat(es.next_due_date)
-                except: es_due_val = date.today()
-                es_due   = esa1.date_input("Next due date", value=es_due_val)
-                es_freq  = esa2.number_input("Frequency (days)", min_value=1, value=es.frequency_days)
-                es_active = st.checkbox("Active", value=es.is_active)
-
-                if st.form_submit_button("Save Changes", type="primary"):
-                    es.task_description = es_task
-                    es.next_due_date    = str(es_due)
-                    es.frequency_days   = int(es_freq)
-                    es.is_active        = es_active
-                    sched.update_schedule(es)
-                    st.toast("Schedule updated.", icon="✅")
-                    st.rerun()
-
-            sg1, sg2, sg3 = st.columns([2, 2, 4])
-            with sg1:
-                tog = "▶ Activate" if not es.is_active else "⏸ Pause"
-                if st.button(tog, key="tog_sched", use_container_width=True):
-                    es.is_active = not es.is_active
-                    sched.update_schedule(es)
-                    st.rerun()
-            with sg2:
-                if st.button("Delete", type="secondary", key="del_sched", use_container_width=True):
-                    _delete_dialog(f"{es.device_name} · {es.task_description}", "schedule", es.id)
+        for dev_name, dev_scheds in by_device.items():
+            overdue_cnt = sum(1 for s in dev_scheds if days_until_due(s.next_due_date) < 0)
+            due_soon_cnt = sum(1 for s in dev_scheds if 0 <= days_until_due(s.next_due_date) <= 7)
+            if overdue_cnt:
+                badge = f"⛔ {overdue_cnt} overdue"
+            elif due_soon_cnt:
+                badge = f"🟡 {due_soon_cnt} due this week"
+            else:
+                badge = "🟢 on track"
+            with st.expander(f"**{dev_name}** — {len(dev_scheds)} schedule(s) · {badge}",
+                             expanded=bool(overdue_cnt)):
+                hcols = st.columns([3, 1, 1, 1])
+                for col, lbl in zip(hcols, ["Task", "Next Due", "Status", ""]):
+                    col.markdown(
+                        f"<span style='font-size:0.75rem;text-transform:uppercase;"
+                        f"color:#64748b;font-weight:600;letter-spacing:0.05em'>{lbl}</span>",
+                        unsafe_allow_html=True,
+                    )
+                st.markdown("<hr style='margin:4px 0 8px'>", unsafe_allow_html=True)
+                for s in dev_scheds:
+                    rc = st.columns([3, 1, 1, 1])
+                    task_label = s.task_description
+                    if not s.is_active:
+                        task_label = f"⏸ {task_label}"
+                    rc[0].markdown(task_label)
+                    rc[1].markdown(f"<span style='font-size:0.85rem'>{s.next_due_date}</span>",
+                                   unsafe_allow_html=True)
+                    rc[2].markdown(f"<span style='font-size:0.85rem'>"
+                                   f"{_status(days_until_due(s.next_due_date))}</span>",
+                                   unsafe_allow_html=True)
+                    if rc[3].button("Open ↗", key=f"sched_open_{s.id}", use_container_width=True):
+                        _schedule_dialog(s)
 
 
 # ══════════════════════════════════════════════════════════════════════════════

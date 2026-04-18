@@ -5,7 +5,7 @@ from .db import get_connection
 from .models import ServiceType
 
 
-def add_service_type(st_obj: ServiceType) -> int:
+def add_service_type(st_obj: ServiceType, first_due_date: Optional[str] = None) -> int:
     with get_connection() as conn:
         cur = conn.execute(
             """INSERT INTO service_types
@@ -24,12 +24,15 @@ def add_service_type(st_obj: ServiceType) -> int:
         )
         service_id = cur.fetchone()["id"]
 
-    _auto_create_schedule(service_id, st_obj)
+    _auto_create_schedule(service_id, st_obj, first_due_date)
     return service_id
 
 
-def _auto_create_schedule(service_type_id: int, st_obj: ServiceType) -> None:
-    next_due = (date.today() + timedelta(days=st_obj.frequency_days)).isoformat()
+def _auto_create_schedule(service_type_id: int, st_obj: ServiceType, first_due_date: Optional[str] = None) -> None:
+    if first_due_date:
+        next_due = first_due_date
+    else:
+        next_due = (date.today() + timedelta(days=st_obj.frequency_days)).isoformat()
     with get_connection() as conn:
         conn.execute(
             """INSERT INTO schedules
