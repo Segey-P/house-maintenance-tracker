@@ -28,11 +28,13 @@
 3. No unnecessary dependencies.
 4. No comments explaining *what* code does — only *why*.
 5. Keep it simple. No premature abstractions.
+6. Keep `TODO.md` current and updated throughout the session.
+7. Update specs in `specs/` at the end of every session and after any major change in requirements or behaviour.
 
 ## TODO.md Convention
 
 `TODO.md` at repo root is the source of truth for what's next.
-The Project Hub dashboard reads it automatically. Keep it updated.
+The Project Hub dashboard reads it automatically. Keep it current and updated throughout the session.
 
 ## Database
 
