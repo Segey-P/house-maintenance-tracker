@@ -14,7 +14,7 @@ from src import history as hist
 from src import scheduler as sched
 from src.models import Device, MaintenanceLog, Schedule
 from src.scheduler import days_until_due
-from utils.auth import require_password, logout_button
+from utils.auth import logout_button  # require_password imported but disabled during dev
 
 CATEGORIES = ["Major Appliances", "Laundry Systems", "Plumbing & Water", "Safety & Electrical"]
 FREQ_ALIASES = {7: "Weekly", 14: "Bi-weekly", 30: "Monthly", 60: "Every 2 months",
@@ -29,7 +29,8 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-require_password()
+# TODO: re-enable password before sharing app publicly
+# require_password()
 
 st.markdown("""
 <style>
@@ -165,7 +166,7 @@ with st.sidebar:
 
 # ── Tabs ──────────────────────────────────────────────────────────────────────
 
-tabs = st.tabs(["📊 Dashboard", "🔧 Inventory", "📋 History", "📅 Schedules", "🔔 Notifications"])
+tabs = st.tabs(["📊 Dashboard", "📱 Devices", "🔧 Maintenance", "📅 Schedules", "🔔 Notifications"])
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -187,7 +188,7 @@ with tabs[0]:
     c3.metric("Due This Week", len(due_week),
               delta=f"upcoming" if due_week else None,
               delta_color="off")
-    c4.metric("Total Spend", _money(total_spend))
+    c4.metric("Spent This Year", _money(hist.total_cost_this_year()))
 
     st.divider()
     col_l, col_r = st.columns(2)
@@ -226,30 +227,81 @@ with tabs[0]:
         else:
             st.info("No maintenance history yet. Log your first task in the History tab.")
 
-    # Category breakdown
-    if devices:
-        st.divider()
-        st.subheader("Inventory by Category")
-        cat_counts = {}
-        for d in devices:
-            cat_counts[d.category] = cat_counts.get(d.category, 0) + 1
-        cat_col = st.columns(len(cat_counts))
-        for i, (cat, count) in enumerate(sorted(cat_counts.items())):
-            cat_col[i].metric(cat, count)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# TAB 1 — INVENTORY
+# TAB 1 — DEVICES
 # ══════════════════════════════════════════════════════════════════════════════
+
+@st.dialog("Device Details", width="large")
+def _device_dialog(device: Device):
+    st.markdown(f"### {device.name}")
+    st.caption(device.category + (" · Archived" if device.is_archived else ""))
+
+    dm1, dm2, dm3 = st.columns(3)
+    dm1.metric("Service Interval", _freq(device.maintenance_frequency_days) if device.maintenance_frequency_days else "—")
+    dm2.metric("Total Spend", _money(hist.total_cost(device.id)))
+    dm3.metric("Warranty Expiry", device.warranty_expiry or "—")
+    st.divider()
+
+    with st.form("device_detail_form"):
+        fa1, fa2 = st.columns(2)
+        ed_name   = fa1.text_input("Device name *", value=device.name)
+        ed_cat    = fa2.selectbox("Category *", CATEGORIES, index=CATEGORIES.index(device.category))
+        fb1, fb2  = st.columns(2)
+        ed_model  = fb1.text_input("Model", value=device.model or "")
+        ed_serial = fb2.text_input("Serial number", value=device.serial_number or "")
+        ed_parts  = st.text_input("Part numbers (comma-separated)", value=", ".join(device.part_numbers))
+        fc1, fc2, fc3 = st.columns(3)
+        ed_freq   = fc1.number_input("Interval (days)", min_value=1, value=device.maintenance_frequency_days or 180)
+        try:    pd_val = date.fromisoformat(device.purchase_date) if device.purchase_date else None
+        except: pd_val = None
+        ed_pdate  = fc2.date_input("Purchase date", value=pd_val)
+        try:    we_val = date.fromisoformat(device.warranty_expiry) if device.warranty_expiry else None
+        except: we_val = None
+        ed_wexp   = fc3.date_input("Warranty expiry", value=we_val)
+        ed_notes  = st.text_area("Notes", value=device.notes or "", height=70)
+        fe1, fe2  = st.columns(2)
+        ed_tut    = fe1.text_input("Tutorial URL", value=device.resource_links.get("tutorial", ""))
+        ed_pur    = fe2.text_input("Purchase URL", value=device.resource_links.get("purchase", ""))
+
+        if st.form_submit_button("Save Changes", type="primary", use_container_width=True):
+            if not ed_name:
+                st.error("Device name is required.")
+            else:
+                device.name     = ed_name
+                device.category = ed_cat
+                device.model    = ed_model or None
+                device.serial_number = ed_serial or None
+                device.part_numbers  = [p.strip() for p in ed_parts.split(",") if p.strip()]
+                device.maintenance_frequency_days = int(ed_freq)
+                device.purchase_date  = str(ed_pdate) if ed_pdate else None
+                device.warranty_expiry = str(ed_wexp) if ed_wexp else None
+                device.notes          = ed_notes or None
+                device.resource_links = {k: v for k, v in [("tutorial", ed_tut), ("purchase", ed_pur)] if v}
+                inv.update_device(device)
+                st.toast("Device updated.", icon="✅")
+                st.rerun()
+
+    st.divider()
+    ga1, ga2, ga3 = st.columns([1, 1, 3])
+    with ga1:
+        arch_label = "Restore" if device.is_archived else "Archive"
+        if st.button(arch_label, key=f"dlg_arch_{device.id}", use_container_width=True):
+            inv.unarchive_device(device.id) if device.is_archived else inv.archive_device(device.id)
+            st.toast(f"Device {'restored' if device.is_archived else 'archived'}.", icon="📦")
+            st.rerun()
+    with ga2:
+        if st.button("Delete", key=f"dlg_del_{device.id}", type="secondary", use_container_width=True):
+            _delete_dialog(device.name, "device", device.id)
+
 
 with tabs[1]:
-    # Header row with primary Add action
     ih1, ih2 = st.columns([5, 1])
-    ih1.subheader("Device Inventory")
+    ih1.subheader("Devices")
     if ih2.button("＋ Add Device", type="primary", use_container_width=True, key="inv_add_toggle"):
         st.session_state.show_inv_add = not st.session_state.get("show_inv_add", False)
 
-    # Add Device form (toggled)
     if st.session_state.get("show_inv_add"):
         with st.container(border=True):
             st.markdown("**New Device**")
@@ -306,96 +358,30 @@ with tabs[1]:
     )
 
     if devs:
-        df = pd.DataFrame([
-            {
-                "Name":     d.name,
-                "Category": d.category,
-                "Model":    _model(d.model),
-                "Interval": _freq(d.maintenance_frequency_days) if d.maintenance_frequency_days else "—",
-                "Spend":    _money(hist.total_cost(d.id)),
-                "Status":   "Archived" if d.is_archived else "Active",
-            }
-            for d in devs
-        ])
-        st.dataframe(df, hide_index=True, width=1100)
+        # Table header
+        hcols = st.columns([3, 2, 2, 1, 1])
+        for col, label in zip(hcols, ["Name", "Category", "Interval", "Spend", ""]):
+            col.markdown(f"**{label}**")
+        st.divider()
+        for d in devs:
+            rc = st.columns([3, 2, 2, 1, 1])
+            rc[0].write(("🗄 " if d.is_archived else "") + d.name)
+            rc[1].write(d.category)
+            rc[2].write(_freq(d.maintenance_frequency_days) if d.maintenance_frequency_days else "—")
+            rc[3].write(_money(hist.total_cost(d.id)))
+            if rc[4].button("Open ↗", key=f"dev_open_{d.id}", use_container_width=True):
+                _device_dialog(d)
     else:
         st.info("No devices found. Add your first device above.")
 
-    # Edit / Manage
-    with st.expander("✏️ Edit / Manage Device"):
-        all_devs  = inv.list_devices(include_archived=True)
-        dev_opts  = {f"{d.name}{' (archived)' if d.is_archived else ''}  —  {d.category}": d
-                     for d in all_devs}
-        sel_label = st.selectbox("Select device to manage", ["— select —"] + list(dev_opts.keys()),
-                                 key="edit_dev_sel")
-
-        if sel_label != "— select —":
-            ed = dev_opts[sel_label]
-            with st.form("edit_device_form"):
-                ea1, ea2 = st.columns(2)
-                ed_name   = ea1.text_input("Device name", value=ed.name)
-                ed_cat    = ea2.selectbox("Category", CATEGORIES, index=CATEGORIES.index(ed.category))
-                eb1, eb2  = st.columns(2)
-                ed_model  = eb1.text_input("Model", value=ed.model or "")
-                ed_serial = eb2.text_input("Serial number", value=ed.serial_number or "")
-                ed_parts  = st.text_input("Part numbers (comma-separated)", value=", ".join(ed.part_numbers))
-                ec1, ec2, ec3 = st.columns(3)
-                ed_freq   = ec1.number_input("Interval (days)", min_value=1,
-                                             value=ed.maintenance_frequency_days or 180)
-                try:    pd_val = date.fromisoformat(ed.purchase_date) if ed.purchase_date else None
-                except: pd_val = None
-                ed_pdate  = ec2.date_input("Purchase date", value=pd_val)
-                try:    we_val = date.fromisoformat(ed.warranty_expiry) if ed.warranty_expiry else None
-                except: we_val = None
-                ed_wexp   = ec3.date_input("Warranty expiry", value=we_val)
-                ed_notes  = st.text_area("Notes", value=ed.notes or "", height=70)
-                ef1, ef2  = st.columns(2)
-                ed_tut    = ef1.text_input("Tutorial URL", value=ed.resource_links.get("tutorial", ""))
-                ed_pur    = ef2.text_input("Purchase URL", value=ed.resource_links.get("purchase", ""))
-
-                if st.form_submit_button("Save Changes", type="primary"):
-                    ed.name     = ed_name
-                    ed.category = ed_cat
-                    ed.model    = ed_model or None
-                    ed.serial_number = ed_serial or None
-                    ed.part_numbers  = [p.strip() for p in ed_parts.split(",") if p.strip()]
-                    ed.maintenance_frequency_days = int(ed_freq)
-                    ed.purchase_date  = str(ed_pdate) if ed_pdate else None
-                    ed.warranty_expiry = str(ed_wexp) if ed_wexp else None
-                    ed.notes          = ed_notes or None
-                    ed.resource_links = {k: v for k, v in [("tutorial", ed_tut), ("purchase", ed_pur)] if v}
-                    inv.update_device(ed)
-                    st.toast("Device updated.", icon="✅")
-                    st.rerun()
-
-            g1, g2, g3 = st.columns([2, 2, 4])
-            with g1:
-                arch_label = "Restore" if ed.is_archived else "Archive"
-                if st.button(arch_label, key="arch_btn", use_container_width=True):
-                    inv.unarchive_device(ed.id) if ed.is_archived else inv.archive_device(ed.id)
-                    st.toast(f"Device {'restored' if ed.is_archived else 'archived'}.", icon="📦")
-                    st.rerun()
-            with g2:
-                if st.button("Delete", key="del_dev_btn", type="secondary", use_container_width=True):
-                    _delete_dialog(ed.name, "device", ed.id)
-
-    # Photo placeholder
-    with st.expander("📷 Add from Photo  ·  Coming in Phase 2"):
-        st.info(
-            "Upload a photo of any appliance and AI will identify the make/model, "
-            "auto-populate specs, and suggest maintenance intervals."
-        )
-        st.file_uploader("Upload photo", type=["jpg", "jpeg", "png"],
-                         disabled=True, label_visibility="collapsed")
-
 
 # ══════════════════════════════════════════════════════════════════════════════
-# TAB 2 — HISTORY / EXPENSES
+# TAB 2 — MAINTENANCE
 # ══════════════════════════════════════════════════════════════════════════════
 
 with tabs[2]:
     hh1, hh2 = st.columns([5, 1])
-    hh1.subheader("Maintenance History")
+    hh1.subheader("Maintenance")
     if hh2.button("＋ Log Expense", type="primary", use_container_width=True, key="hist_add_toggle"):
         st.session_state.show_hist_add = not st.session_state.get("show_hist_add", False)
 
@@ -617,10 +603,10 @@ with tabs[3]:
 
 with tabs[4]:
     st.subheader("Notifications")
-    n_col1, n_col2 = st.columns(2)
 
     # ── Google Calendar ───────────────────────────────────────────────────────
-    with n_col1:
+    cal_col, future_col = st.columns(2)
+    with cal_col:
         with st.container(border=True):
             st.markdown("### 🗓 Google Calendar")
             n_all_devs  = inv.list_devices()
@@ -661,41 +647,16 @@ with tabs[4]:
                     st.warning(f"Pushed {pushed}, failed {errors}.")
                 st.rerun()
 
-    # ── Email Alerts ──────────────────────────────────────────────────────────
-    with n_col2:
+    # ── Future Features ───────────────────────────────────────────────────────
+    # TODO: re-enable password gate before sharing app publicly (utils/auth.py → require_password)
+    # TODO: download schedule as a checklist (PDF or CSV export of upcoming tasks)
+    # TODO: email alerts — send maintenance reminders to user email
+    with future_col:
         with st.container(border=True):
-            st.markdown("### 📧 Email Alerts")
-            st.caption(f"Recipient: **sergey.pochikovskiy@gmail.com**")
-
-            alert_days   = st.slider("Alert window (days)", 1, 30, 7, key="alert_days")
-            due_preview  = sched.get_due_schedules(days_ahead=alert_days)
-
-            if due_preview:
-                st.markdown(f"**{len(due_preview)} alert(s) will be sent:**")
-                for s in due_preview:
-                    d = days_until_due(s.next_due_date)
-                    st.markdown(f"· {s.device_name} — {s.task_description} &nbsp; `{_status(d)}`")
-            else:
-                st.info(f"Nothing due within {alert_days} days. No emails to send.")
-
-            st.write("")
-            if st.button("Send Alerts", type="primary", key="send_email",
-                         disabled=not due_preview, use_container_width=True):
-                from src.notifications import send_email_alert
-                sent = 0
-                with st.spinner("Sending…"):
-                    for s in due_preview:
-                        dev = inv.get_device(s.device_id)
-                        if not dev:
-                            continue
-                        try:
-                            send_email_alert(
-                                device_name=dev.name, category=dev.category,
-                                task_description=s.task_description, due_date=s.next_due_date,
-                                part_numbers=dev.part_numbers, resource_links=dev.resource_links,
-                                notes=dev.notes,
-                            )
-                            sent += 1
-                        except Exception as e:
-                            st.error(f"{dev.name}: {e}")
-                st.toast(f"Sent {sent} email alert(s).", icon="📧")
+            st.markdown("### 🚧 Coming Soon")
+            st.markdown("""
+- **Download schedule** — export upcoming tasks as a printable checklist
+- **Email alerts** — maintenance reminders sent to your inbox
+- **Google Calendar sync** — push schedules as recurring calendar events
+- **Photo import** — identify appliance from photo, auto-fill specs
+""")

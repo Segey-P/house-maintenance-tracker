@@ -69,6 +69,23 @@ def delete_log(log_id: int) -> None:
         conn.execute("DELETE FROM maintenance_log WHERE id = %s", (log_id,))
 
 
+def total_cost_this_year(device_id: Optional[int] = None) -> float:
+    from datetime import date
+    prefix = f"{date.today().year}-%"
+    with get_connection() as conn:
+        if device_id:
+            row = conn.execute(
+                "SELECT COALESCE(SUM(cost_cad),0) as total FROM maintenance_log WHERE device_id=%s AND completion_date LIKE %s",
+                (device_id, prefix),
+            ).fetchone()
+        else:
+            row = conn.execute(
+                "SELECT COALESCE(SUM(cost_cad),0) as total FROM maintenance_log WHERE completion_date LIKE %s",
+                (prefix,),
+            ).fetchone()
+    return float(row["total"])
+
+
 def total_cost(device_id: Optional[int] = None) -> float:
     with get_connection() as conn:
         if device_id:
