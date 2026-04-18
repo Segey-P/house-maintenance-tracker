@@ -2,17 +2,15 @@
 
 ## In Progress
 
-- [ ] Update app.py UI for service types: device popup services section, maintenance log with service type selector, schedules tab cleanup
+_(nothing active)_
 
 ## Next Up
 
-- [ ] Re-enable password gate before sharing app publicly (`utils/auth.py` — uncomment `require_password()` in `app.py`)
 - [ ] Download schedule as checklist (CSV or PDF export of upcoming tasks from Schedules tab)
 
 ## Backlog
 
 - [ ] Google Calendar integration — store OAuth token in Streamlit secrets for cloud use
-- [ ] Email alerts — maintenance reminders to user inbox
 
 ## Done
 
@@ -21,3 +19,7 @@
 - [x] Add database credentials and password hash to Streamlit secrets
 - [x] Build core UI: Dashboard, Devices, Maintenance, Schedules, Notifications tabs
 - [x] Service types data model: new schema, CRUD module, updated schedules and maintenance_log
+- [x] Service types UI: list, add, edit, delete inside device dialog
+- [x] Fix Device add/edit TypeError (removed part_numbers, maintenance_frequency_days, resource_links from Device model)
+- [x] Re-enable password gate (`require_password()` active in app.py)
+- [x] Remove email alerts feature (dropped from backlog and Coming Soon)

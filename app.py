@@ -12,9 +12,10 @@ from src.db import init_db
 from src import inventory as inv
 from src import history as hist
 from src import scheduler as sched
-from src.models import Device, MaintenanceLog, Schedule
+from src import services as svcs
+from src.models import Device, MaintenanceLog, Schedule, ServiceType
 from src.scheduler import days_until_due
-from utils.auth import logout_button  # require_password imported but disabled during dev
+from utils.auth import logout_button, require_password
 
 CATEGORIES = ["Major Appliances", "Laundry Systems", "Plumbing & Water", "Safety & Electrical"]
 FREQ_ALIASES = {7: "Weekly", 14: "Bi-weekly", 30: "Monthly", 60: "Every 2 months",
@@ -29,8 +30,7 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# TODO: re-enable password before sharing app publicly
-# require_password()
+require_password()
 
 st.markdown("""
 <style>
@@ -237,7 +237,6 @@ with tabs[0]:
     st.subheader("🚧 Coming Soon")
     st.markdown("""
 - **Download schedule** — export upcoming tasks as a printable checklist
-- **Email alerts** — maintenance reminders sent to your inbox
 - **Google Calendar sync** — push schedules as recurring calendar events
 - **Photo import** — identify appliance from photo, auto-fill specs
 """)
@@ -253,10 +252,9 @@ def _device_dialog(device: Device):
     st.markdown(f"### {device.name}")
     st.caption(device.category + (" · Archived" if device.is_archived else ""))
 
-    dm1, dm2, dm3 = st.columns(3)
-    dm1.metric("Service Interval", _freq(device.maintenance_frequency_days) if device.maintenance_frequency_days else "—")
-    dm2.metric("Total Spend", _money(hist.total_cost(device.id)))
-    dm3.metric("Warranty Expiry", device.warranty_expiry or "—")
+    dm1, dm2 = st.columns(2)
+    dm1.metric("Total Spend", _money(hist.total_cost(device.id)))
+    dm2.metric("Warranty Expiry", device.warranty_expiry or "—")
     st.divider()
 
     with st.form("device_detail_form"):
@@ -266,37 +264,113 @@ def _device_dialog(device: Device):
         fb1, fb2  = st.columns(2)
         ed_model  = fb1.text_input("Model", value=device.model or "")
         ed_serial = fb2.text_input("Serial number", value=device.serial_number or "")
-        ed_parts  = st.text_input("Part numbers (comma-separated)", value=", ".join(device.part_numbers))
-        fc1, fc2, fc3 = st.columns(3)
-        ed_freq   = fc1.number_input("Interval (days)", min_value=1, value=device.maintenance_frequency_days or 180)
+        fc1, fc2  = st.columns(2)
         try:    pd_val = date.fromisoformat(device.purchase_date) if device.purchase_date else None
         except: pd_val = None
-        ed_pdate  = fc2.date_input("Purchase date", value=pd_val)
+        ed_pdate  = fc1.date_input("Purchase date", value=pd_val)
         try:    we_val = date.fromisoformat(device.warranty_expiry) if device.warranty_expiry else None
         except: we_val = None
-        ed_wexp   = fc3.date_input("Warranty expiry", value=we_val)
+        ed_wexp   = fc2.date_input("Warranty expiry", value=we_val)
         ed_notes  = st.text_area("Notes", value=device.notes or "", height=70)
-        fe1, fe2  = st.columns(2)
-        ed_tut    = fe1.text_input("Tutorial URL", value=device.resource_links.get("tutorial", ""))
-        ed_pur    = fe2.text_input("Purchase URL", value=device.resource_links.get("purchase", ""))
 
         if st.form_submit_button("Save Changes", type="primary", use_container_width=True):
             if not ed_name:
                 st.error("Device name is required.")
             else:
-                device.name     = ed_name
-                device.category = ed_cat
-                device.model    = ed_model or None
-                device.serial_number = ed_serial or None
-                device.part_numbers  = [p.strip() for p in ed_parts.split(",") if p.strip()]
-                device.maintenance_frequency_days = int(ed_freq)
-                device.purchase_date  = str(ed_pdate) if ed_pdate else None
+                device.name            = ed_name
+                device.category        = ed_cat
+                device.model           = ed_model or None
+                device.serial_number   = ed_serial or None
+                device.purchase_date   = str(ed_pdate) if ed_pdate else None
                 device.warranty_expiry = str(ed_wexp) if ed_wexp else None
-                device.notes          = ed_notes or None
-                device.resource_links = {k: v for k, v in [("tutorial", ed_tut), ("purchase", ed_pur)] if v}
+                device.notes           = ed_notes or None
                 inv.update_device(device)
                 st.toast("Device updated.", icon="✅")
                 st.rerun()
+
+    # ── Service Types ──────────────────────────────────────────────────────────
+    st.divider()
+    sc1, sc2 = st.columns([4, 1])
+    sc1.markdown("**Service Types**")
+    add_key = f"show_st_add_{device.id}"
+    if sc2.button("＋ Add", key=f"st_add_toggle_{device.id}", use_container_width=True):
+        st.session_state[add_key] = not st.session_state.get(add_key, False)
+
+    if st.session_state.get(add_key):
+        with st.container(border=True):
+            with st.form(f"add_st_form_{device.id}", clear_on_submit=True):
+                st_name  = st.text_input("Service name *", placeholder="e.g. Filter Replacement")
+                sta1, sta2 = st.columns(2)
+                st_freq  = sta1.number_input("Interval (days) *", min_value=1, value=90)
+                st_parts = sta2.text_input("Part numbers", placeholder="Comma-separated")
+                stb1, stb2 = st.columns(2)
+                st_tut   = stb1.text_input("Tutorial URL")
+                st_pur   = stb2.text_input("Purchase URL")
+                st_notes = st.text_area("Notes", height=60)
+                stc1, stc2 = st.columns(2)
+                st_sub = stc1.form_submit_button("Add Service Type", type="primary", use_container_width=True)
+                st_can = stc2.form_submit_button("Cancel", use_container_width=True)
+
+            if st_sub:
+                if not st_name:
+                    st.error("Service name is required.")
+                else:
+                    svcs.add_service_type(ServiceType(
+                        device_id=device.id,
+                        name=st_name,
+                        frequency_days=int(st_freq),
+                        part_numbers=[p.strip() for p in st_parts.split(",") if p.strip()],
+                        tutorial_url=st_tut or None,
+                        purchase_url=st_pur or None,
+                        notes=st_notes or None,
+                    ))
+                    st.session_state[add_key] = False
+                    st.toast("Service type added.", icon="✅")
+                    st.rerun()
+            if st_can:
+                st.session_state[add_key] = False
+                st.rerun()
+
+    service_types = svcs.list_service_types(device.id)
+    if service_types:
+        for stype in service_types:
+            with st.container(border=True):
+                s1, s2, s3 = st.columns([4, 1, 1])
+                s1.markdown(f"**{stype.name}**  ·  {_freq(stype.frequency_days)}")
+                if stype.part_numbers:
+                    s1.caption("Parts: " + ", ".join(stype.part_numbers))
+                if stype.tutorial_url:
+                    s1.caption(f"[Tutorial]({stype.tutorial_url})")
+                edit_key = f"edit_st_{stype.id}"
+                if s2.button("Edit", key=f"st_edit_{stype.id}", use_container_width=True):
+                    st.session_state[edit_key] = not st.session_state.get(edit_key, False)
+                if s3.button("Delete", key=f"st_del_{stype.id}", type="secondary", use_container_width=True):
+                    svcs.delete_service_type(stype.id)
+                    st.toast("Service type deleted.", icon="🗑")
+                    st.rerun()
+                if st.session_state.get(edit_key):
+                    with st.form(f"edit_st_form_{stype.id}"):
+                        e_name  = st.text_input("Name", value=stype.name)
+                        ea1, ea2 = st.columns(2)
+                        e_freq  = ea1.number_input("Interval (days)", min_value=1, value=stype.frequency_days)
+                        e_parts = ea2.text_input("Part numbers", value=", ".join(stype.part_numbers))
+                        eb1, eb2 = st.columns(2)
+                        e_tut   = eb1.text_input("Tutorial URL", value=stype.tutorial_url or "")
+                        e_pur   = eb2.text_input("Purchase URL", value=stype.purchase_url or "")
+                        e_notes = st.text_area("Notes", value=stype.notes or "", height=60)
+                        if st.form_submit_button("Save", type="primary"):
+                            stype.name          = e_name
+                            stype.frequency_days = int(e_freq)
+                            stype.part_numbers  = [p.strip() for p in e_parts.split(",") if p.strip()]
+                            stype.tutorial_url  = e_tut or None
+                            stype.purchase_url  = e_pur or None
+                            stype.notes         = e_notes or None
+                            svcs.update_service_type(stype)
+                            st.session_state[edit_key] = False
+                            st.toast("Service type updated.", icon="✅")
+                            st.rerun()
+    else:
+        st.caption("No service types yet. Add one to define maintenance intervals and parts.")
 
     st.divider()
     ga1, ga2, ga3 = st.columns([1, 1, 3])
@@ -327,15 +401,10 @@ with tabs[1]:
                 b1, b2   = st.columns(2)
                 d_model  = b1.text_input("Model", placeholder="e.g. WRF535SWHZ")
                 d_serial = b2.text_input("Serial number")
-                d_parts  = st.text_input("Part numbers", placeholder="Comma-separated, e.g. DA29-00020B, WF3CB")
-                c1, c2, c3 = st.columns(3)
-                d_freq   = c1.number_input("Service interval (days) *", min_value=1, value=180)
-                d_pdate  = c2.date_input("Purchase date", value=None)
-                d_wexp   = c3.date_input("Warranty expiry", value=None)
+                c1, c2   = st.columns(2)
+                d_pdate  = c1.date_input("Purchase date", value=None)
+                d_wexp   = c2.date_input("Warranty expiry", value=None)
                 d_notes  = st.text_area("Notes", height=70, placeholder="Tips, BC code requirements, etc.")
-                e1, e2   = st.columns(2)
-                d_tutorial = e1.text_input("Tutorial URL", placeholder="YouTube link")
-                d_purchase = e2.text_input("Purchase URL", placeholder="Amazon.ca link")
                 fc1, fc2 = st.columns(2)
                 submitted = fc1.form_submit_button("Save Device", type="primary", use_container_width=True)
                 cancelled = fc2.form_submit_button("Cancel", use_container_width=True)
@@ -344,18 +413,15 @@ with tabs[1]:
                 if not d_name:
                     st.error("Device name is required.")
                 else:
-                    links = {k: v for k, v in [("tutorial", d_tutorial), ("purchase", d_purchase)] if v}
                     inv.add_device(Device(
                         name=d_name, category=d_cat,
                         model=d_model or None, serial_number=d_serial or None,
-                        part_numbers=[p.strip() for p in d_parts.split(",") if p.strip()],
-                        maintenance_frequency_days=int(d_freq),
                         purchase_date=str(d_pdate) if d_pdate else None,
                         warranty_expiry=str(d_wexp) if d_wexp else None,
-                        notes=d_notes or None, resource_links=links,
+                        notes=d_notes or None,
                     ))
                     st.session_state.show_inv_add = False
-                    st.toast("Device added.", icon="✅")
+                    st.toast("Device added. Open it to add service types.", icon="✅")
                     st.rerun()
             if cancelled:
                 st.session_state.show_inv_add = False
@@ -373,19 +439,18 @@ with tabs[1]:
     )
 
     if devs:
-        hcols = st.columns([3, 2, 2, 1, 1])
-        for col, label in zip(hcols, ["Name", "Category", "Interval", "Spend", ""]):
+        hcols = st.columns([3, 2, 1, 1])
+        for col, label in zip(hcols, ["Name", "Category", "Spend", ""]):
             col.markdown(f"<span style='font-size:0.75rem;text-transform:uppercase;color:#64748b;font-weight:600;letter-spacing:0.05em'>{label}</span>", unsafe_allow_html=True)
         st.markdown("<hr style='margin:4px 0 8px'>", unsafe_allow_html=True)
         for d in devs:
             with st.container():
-                rc = st.columns([3, 2, 2, 1, 1])
+                rc = st.columns([3, 2, 1, 1])
                 name_text = f"{'🗄 ' if d.is_archived else ''}{d.name}"
                 rc[0].markdown(f"**{name_text}**")
                 rc[1].markdown(f"<span style='font-size:0.85rem;color:#475569'>{d.category}</span>", unsafe_allow_html=True)
-                rc[2].markdown(f"<span style='font-size:0.85rem'>{_freq(d.maintenance_frequency_days) if d.maintenance_frequency_days else '—'}</span>", unsafe_allow_html=True)
-                rc[3].markdown(f"<span style='font-size:0.85rem'>{_money(hist.total_cost(d.id))}</span>", unsafe_allow_html=True)
-                if rc[4].button("Open ↗", key=f"dev_open_{d.id}", use_container_width=True):
+                rc[2].markdown(f"<span style='font-size:0.85rem'>{_money(hist.total_cost(d.id))}</span>", unsafe_allow_html=True)
+                if rc[3].button("Open ↗", key=f"dev_open_{d.id}", use_container_width=True):
                     _device_dialog(d)
             st.markdown("<hr style='margin:2px 0;border-color:#f1f5f9'>", unsafe_allow_html=True)
     else:
@@ -664,6 +729,4 @@ with tabs[4]:
                     st.warning(f"Pushed {pushed}, failed {errors}.")
                 st.rerun()
 
-    # TODO: re-enable password gate before sharing app publicly (utils/auth.py → require_password)
     # TODO: download schedule as a checklist (PDF or CSV export of upcoming tasks)
-    # TODO: email alerts — send maintenance reminders to user email
