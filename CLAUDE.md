@@ -1,29 +1,41 @@
 # Claude Context — House Maintenance Tracker
 
+## Project Overview
+
+- **Status:** In Development
+- **Repo:** github.com/Segey-P/house-maintenance-tracker
+- **Purpose:** Track home maintenance tasks, intervals, and costs. Surfaces overdue items and logs historical work.
+- **Stack:** Streamlit + PostgreSQL (psycopg2)
+- **Deploy:** Streamlit Community Cloud
+
 ## User Profile
 
 - **Role:** Senior IT Consultant (Banking sector), Canadian (Squamish, BC — Pacific Time)
 - **Style:** Direct, precise, no softening. Tables and bullet points.
 - **Technical level:** Not a developer — use plain language when explaining options.
-- **Workflow:** Cloud-first via Claude Code web, mobile access via Claude app.
-- **Units:** Metric (cm, kg, °C). Currency: CAD.
-
-## What This Project Is
-
-Home maintenance tracker for a one-bedroom residence. Tracks appliances, maintenance history, scheduled service, and a web UI for CRUD. Canadian context.
+- **Workflow:** Cloud-first via Claude Code web. Minimize local machine dependency.
 
 ## Before Making Changes
 
-1. Read all files in `specs/` — they are authoritative.
-2. Read `AGENTS.md` (agent-neutral mirror of this file).
+1. Read `TODO.md` — current next actions.
+2. Read all files in `specs/` if present.
+3. Never commit secrets or credentials.
 
-## Deployment
+## AI Agent Rules
 
-Primary target: **Streamlit Community Cloud**, password-protected (same bcrypt + `st.secrets` pattern as Project Management Hub). Local dev still supported.
+1. Push directly to `main`.
+2. Prefer editing existing files over creating new ones.
+3. No unnecessary dependencies.
+4. No comments explaining *what* code does — only *why*.
+5. Keep it simple. No premature abstractions.
 
-Data storage for the cloud deployment must tolerate an ephemeral filesystem — do not rely on local disk writes.
+## TODO.md Convention
 
-## Rules
+`TODO.md` at repo root is the source of truth for what's next.
+The Project Hub dashboard reads it automatically. Keep it updated.
 
-- Follow spec file naming: `[type]-[kebab-topic].md`.
-- Module specs define what should be built — update Status sections only, don't rewrite to match what was built.
+## Database
+
+- PostgreSQL via psycopg2
+- Connection string in `st.secrets["DATABASE_URL"]`
+- Always use `sslmode=require` for cloud connections
