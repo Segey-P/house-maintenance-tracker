@@ -17,7 +17,7 @@ from src.models import Device, MaintenanceLog, Schedule, ServiceType
 from src.scheduler import days_until_due
 from utils.auth import logout_button, require_password
 
-CATEGORIES = ["Major Appliances", "Laundry Systems", "Plumbing & Water", "Safety & Electrical"]
+CATEGORIES = ["Major Appliances", "Kitchen Appliances", "Laundry Systems", "Plumbing & Water", "Safety & Electrical"]
 FREQ_ALIASES = {7: "Weekly", 14: "Bi-weekly", 30: "Monthly", 60: "Every 2 months",
                 90: "Quarterly", 120: "Every 4 months", 180: "Semi-annual", 365: "Annual"}
 LIMIT_OPTIONS = [10, 25, 50, 100]
