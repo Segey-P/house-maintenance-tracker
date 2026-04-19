@@ -11,6 +11,7 @@ _(nothing active)_
 ## Backlog
 
 - [ ] Google Calendar integration — store OAuth token in Streamlit secrets for cloud use
+- [ ] Gemini CSV import — structured CSV format that Gemini can produce from a camera walkthrough, importable via the UI (devices + service types in one file). See `scripts/seed_data.sql` as schema reference.
 
 ## Done
 
