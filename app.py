@@ -172,6 +172,21 @@ def _schedule_dialog(s: Schedule):
     dm3.metric("Repeats", _freq(s.frequency_days))
     st.divider()
 
+    # Show service type details if linked
+    if s.service_type_id:
+        stype = svcs.get_service_type(s.service_type_id)
+        if stype:
+            if stype.part_numbers:
+                st.markdown(f"**Parts:** {', '.join(stype.part_numbers)}")
+            pc1, pc2 = st.columns(2)
+            if stype.tutorial_url:
+                pc1.markdown(f"**Tutorial:** [{stype.tutorial_url}]({stype.tutorial_url})")
+            if stype.purchase_url:
+                pc2.markdown(f"**Purchase:** [{stype.purchase_url}]({stype.purchase_url})")
+            if stype.notes:
+                st.info(stype.notes)
+            st.divider()
+
     with st.form("edit_sched_dlg_form"):
         es_task = st.text_input("Task description", value=s.task_description)
         esa1, esa2 = st.columns(2)
@@ -511,47 +526,41 @@ def _device_dialog(device: Device):
             _delete_dialog(device.name, "device", device.id)
 
 
+@st.dialog("Add Device", width="large")
+def _add_device_dialog():
+    with st.form("add_device_form", clear_on_submit=True):
+        a1, a2 = st.columns(2)
+        d_name   = a1.text_input("Device name *", placeholder="e.g. Main Fridge")
+        d_cat    = a2.selectbox("Category *", CATEGORIES)
+        b1, b2   = st.columns(2)
+        d_model  = b1.text_input("Model", placeholder="e.g. WRF535SWHZ")
+        d_serial = b2.text_input("Serial number")
+        c1, c2   = st.columns(2)
+        d_pdate  = c1.date_input("Purchase date", value=None)
+        d_wexp   = c2.date_input("Warranty expiry", value=None)
+        d_notes  = st.text_area("Notes", height=70, placeholder="Tips, BC code requirements, etc.")
+        submitted = st.form_submit_button("Save Device", type="primary", use_container_width=True)
+
+    if submitted:
+        if not d_name:
+            st.error("Device name is required.")
+        else:
+            new_id = inv.add_device(Device(
+                name=d_name, category=d_cat,
+                model=d_model or None, serial_number=d_serial or None,
+                purchase_date=str(d_pdate) if d_pdate else None,
+                warranty_expiry=str(d_wexp) if d_wexp else None,
+                notes=d_notes or None,
+            ))
+            st.session_state["open_device_id"] = new_id
+            st.rerun()
+
+
 with tabs[1]:
     ih1, ih2 = st.columns([5, 1])
     ih1.subheader("Devices")
-    if ih2.button("＋ Add Device", type="primary", use_container_width=True, key="inv_add_toggle"):
-        st.session_state.show_inv_add = not st.session_state.get("show_inv_add", False)
-
-    if st.session_state.get("show_inv_add"):
-        with st.container(border=True):
-            st.markdown("**New Device**")
-            with st.form("add_device_form", clear_on_submit=True):
-                a1, a2 = st.columns(2)
-                d_name   = a1.text_input("Device name *", placeholder="e.g. Main Fridge")
-                d_cat    = a2.selectbox("Category *", CATEGORIES)
-                b1, b2   = st.columns(2)
-                d_model  = b1.text_input("Model", placeholder="e.g. WRF535SWHZ")
-                d_serial = b2.text_input("Serial number")
-                c1, c2   = st.columns(2)
-                d_pdate  = c1.date_input("Purchase date", value=None)
-                d_wexp   = c2.date_input("Warranty expiry", value=None)
-                d_notes  = st.text_area("Notes", height=70, placeholder="Tips, BC code requirements, etc.")
-                fc1, fc2 = st.columns(2)
-                submitted = fc1.form_submit_button("Save Device", type="primary", use_container_width=True)
-                cancelled = fc2.form_submit_button("Cancel", use_container_width=True)
-
-            if submitted:
-                if not d_name:
-                    st.error("Device name is required.")
-                else:
-                    new_id = inv.add_device(Device(
-                        name=d_name, category=d_cat,
-                        model=d_model or None, serial_number=d_serial or None,
-                        purchase_date=str(d_pdate) if d_pdate else None,
-                        warranty_expiry=str(d_wexp) if d_wexp else None,
-                        notes=d_notes or None,
-                    ))
-                    st.session_state.show_inv_add = False
-                    st.session_state["open_device_id"] = new_id
-                    st.rerun()
-            if cancelled:
-                st.session_state.show_inv_add = False
-                st.rerun()
+    if ih2.button("＋ Add Device", type="primary", use_container_width=True, key="inv_add_btn"):
+        _add_device_dialog()
 
     # Auto-open dialog for a freshly created device so user can add service types immediately
     _open_id = st.session_state.pop("open_device_id", None)
