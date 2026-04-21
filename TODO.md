@@ -28,14 +28,15 @@ Stack decision: **Option A** — Streamlit + `@st.dialog` modals (~80% visual pa
 - [x] Inline ✓ Done + ⏭ Skip + ⏸ Pause with expand-below quick-log form
 - [x] Recent Activity as card list (5 entries)
 
-### Wave 3 — Devices redesign
-- [ ] Card grid (auto-fill, minmax 280px)
-- [ ] Dashed "+ Add Device" tile
-- [ ] Accent strip + status badge + category pill + warranty-expiring badge
-- [ ] Device dialog: 4×2 specs grid, amber notes block, nested service type cards
-- [ ] Inline delete confirmation (replace `_delete_dialog` for device)
-- [ ] Category spend on device cards
-- Archive: keep in both DB and UI (design's removal = design error)
+### Wave 3 — Devices redesign (done)
+- [x] Card grid (3-col `st.columns` — Streamlit can't emit true CSS auto-fill)
+- [x] Accent strip + status badge + category pill + warranty-expiring badge
+- [x] Device dialog: 4-col specs row + 4-col metrics row, amber notes block
+- [x] Nested service type cards retained (cleanup deferred if needed)
+- [x] Inline delete confirmation (replaces `_delete_dialog` modal for device)
+- [x] Category spend on device cards (Total + YTD)
+- [ ] Dashed "+ Add Device" tile — deferred to Wave 6 (needs custom component)
+- Archive: keeps working in DB + UI (design's removal = design error)
 
 ### Wave 4 — History + Schedules refactor
 - [ ] History: flat card list, date/category/from-to filters, amber due-tasks banner with chip row

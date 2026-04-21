@@ -15,7 +15,7 @@ from src import scheduler as sched
 from src import services as svcs
 from src.models import Device, MaintenanceLog, Schedule, ServiceType
 from src.scheduler import days_until_due
-from src.ui import badge_html, stat_card_html, status_info
+from src.ui import STATUS_STYLES, badge_html, stat_card_html, status_info
 from utils.auth import logout_button, require_password
 
 CATEGORIES = ["Major Appliances", "Kitchen Appliances", "Laundry Systems", "Plumbing & Water", "Safety & Electrical"]
@@ -197,6 +197,29 @@ section[data-testid="stSidebar"] .stButton > button[kind="primary"] {
     background: #ef4444; color: #fff; font-size: 10px; font-weight: 700;
     border-radius: 20px; padding: 1px 6px; margin-left: 4px;
 }
+
+/* Category pill — design §2.3 neutral pill variant */
+.hmt-pill {
+    display: inline-block; font-size: 11px; font-weight: 600;
+    letter-spacing: 0.03em; padding: 2px 8px; border-radius: 20px;
+    background: #f4f4f5; color: #52525b; border: 1px solid #e4e4e7;
+}
+
+/* Device dialog specs grid label/value pair */
+.hmt-spec-label {
+    font-size: 11px; color: #9ca3af; text-transform: uppercase;
+    letter-spacing: 0.04em; font-weight: 600;
+}
+.hmt-spec-value {
+    font-size: 14px; color: #1c1c1e; font-weight: 600; margin-top: 2px;
+}
+
+/* Amber notes block — design §3 device detail */
+.hmt-notes {
+    background: #fffbeb; border: 1px solid #fde68a; border-left: 3px solid #f59e0b;
+    border-radius: 8px; padding: 10px 14px; color: #78350f; font-size: 13px;
+    line-height: 1.5; margin: 8px 0 12px;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -310,6 +333,69 @@ def _dash_task_group(label: str, schedules: list) -> None:
                 if l_can:
                     st.session_state.pop(log_key, None)
                     st.rerun()
+
+
+def _device_card(d: Device, device_schedules: list) -> None:
+    """Device grid card — design §3 Devices card."""
+    upcoming = [s for s in device_schedules if s.is_active]
+    next_sched = min(upcoming, key=lambda s: days_until_due(s.next_due_date)) if upcoming else None
+    days_val = days_until_due(next_sched.next_due_date) if next_sched else None
+    sinfo = status_info(days_val)
+    dot_color = STATUS_STYLES[sinfo["status"]]["dot"]
+
+    warranty_expiring = False
+    if d.warranty_expiry:
+        try:
+            wdays = (date.fromisoformat(d.warranty_expiry) - date.today()).days
+            warranty_expiring = 0 <= wdays <= 60
+        except Exception:
+            pass
+
+    with st.container(border=True):
+        st.markdown(
+            f"<div style='height:4px;background:{dot_color};"
+            f"margin:-16px -16px 12px -16px;border-radius:12px 12px 0 0'></div>",
+            unsafe_allow_html=True,
+        )
+        archived_tag = (
+            "<span class='hmt-pill' style='background:#fef2f2;color:#dc2626;"
+            "border-color:#fecaca;margin-left:6px'>Archived</span>"
+            if d.is_archived else ""
+        )
+        st.markdown(
+            f"<div style='font-size:16px;font-weight:700;color:#1c1c1e'>"
+            f"{d.name}{archived_tag}</div>"
+            f"<div style='font-size:13px;color:#6b7280;margin-top:2px'>"
+            f"{d.model or '—'}</div>",
+            unsafe_allow_html=True,
+        )
+
+        pills = [f'<span class="hmt-pill">{d.category}</span>',
+                 badge_html(sinfo["status"], sinfo["label"])]
+        if warranty_expiring:
+            pills.append(badge_html("soon", "Warranty expiring"))
+        st.markdown(
+            "<div style='margin-top:10px;display:flex;flex-wrap:wrap;gap:6px'>"
+            + "".join(pills)
+            + "</div>",
+            unsafe_allow_html=True,
+        )
+
+        spend_total = hist.total_cost(d.id)
+        spend_ytd   = hist.total_cost_this_year(d.id)
+        st.markdown(
+            f"<div style='margin-top:12px;display:flex;gap:18px'>"
+            f"<div><div class='hmt-spec-label'>Spend</div>"
+            f"<div class='hmt-spec-value'>{_money(spend_total)}</div></div>"
+            f"<div><div class='hmt-spec-label'>YTD</div>"
+            f"<div class='hmt-spec-value'>{_money(spend_ytd)}</div></div>"
+            f"</div>",
+            unsafe_allow_html=True,
+        )
+
+        if st.button("Open ↗", key=f"dev_open_{d.id}", use_container_width=True):
+            _device_dialog(d)
+
 
 # ── Log-entry dialog ──────────────────────────────────────────────────────────
 
@@ -430,52 +516,96 @@ def _delete_dialog(label: str, entity: str, entity_id: int):
 
 @st.dialog("Device Details", width="large")
 def _device_dialog(device: Device):
-    st.markdown(f"### {device.name}")
-    st.caption(device.category + (" · Archived" if device.is_archived else ""))
-
     recent_logs = hist.list_logs(device_id=device.id, limit=10)
     last_svc = recent_logs[0] if recent_logs else None
+    dev_schedules = [s for s in sched.list_schedules(active_only=False) if s.device_id == device.id]
+    next_sched = min(
+        [s for s in dev_schedules if s.is_active],
+        key=lambda s: days_until_due(s.next_due_date),
+        default=None,
+    )
 
-    dm1, dm2, dm3 = st.columns(3)
-    dm1.metric("Total Spend", _money(hist.total_cost(device.id)))
-    dm2.metric("Warranty Expiry", device.warranty_expiry or "—")
-    if last_svc:
-        dm3.metric("Last Service", last_svc.completion_date)
-        dm3.caption(last_svc.service_type_name or last_svc.task_performed[:30])
-    else:
-        dm3.metric("Last Service", "—")
-    st.divider()
+    head_pill = (
+        f'<span class="hmt-pill">{device.category}</span>'
+        + (' <span class="hmt-pill" style="background:#fef2f2;color:#dc2626;'
+           'border-color:#fecaca;margin-left:6px">Archived</span>' if device.is_archived else "")
+    )
+    st.markdown(
+        f"<div style='font-size:22px;font-weight:800;color:#1c1c1e'>{device.name}</div>"
+        f"<div style='margin-top:4px'>{head_pill}</div>",
+        unsafe_allow_html=True,
+    )
 
-    with st.form("device_detail_form"):
-        fa1, fa2 = st.columns(2)
-        ed_name   = fa1.text_input("Device name *", value=device.name)
-        ed_cat    = fa2.selectbox("Category *", CATEGORIES, index=CATEGORIES.index(device.category))
-        fb1, fb2  = st.columns(2)
-        ed_model  = fb1.text_input("Model", value=device.model or "")
-        ed_serial = fb2.text_input("Serial number", value=device.serial_number or "")
-        fc1, fc2  = st.columns(2)
-        try:    pd_val = date.fromisoformat(device.purchase_date) if device.purchase_date else None
-        except: pd_val = None
-        ed_pdate  = fc1.date_input("Purchase date", value=pd_val)
-        try:    we_val = date.fromisoformat(device.warranty_expiry) if device.warranty_expiry else None
-        except: we_val = None
-        ed_wexp   = fc2.date_input("Warranty expiry", value=we_val)
-        ed_notes  = st.text_area("Notes", value=device.notes or "", height=70)
+    # ── Specs grid (row 1): Model · Serial · Purchased · Warranty ─────────────
+    s1, s2, s3, s4 = st.columns(4)
+    for col, label, value in [
+        (s1, "Model",     device.model or "—"),
+        (s2, "Serial",    device.serial_number or "—"),
+        (s3, "Purchased", device.purchase_date or "—"),
+        (s4, "Warranty",  device.warranty_expiry or "—"),
+    ]:
+        col.markdown(
+            f"<div class='hmt-spec-label'>{label}</div>"
+            f"<div class='hmt-spec-value'>{value}</div>",
+            unsafe_allow_html=True,
+        )
 
-        if st.form_submit_button("Save Changes", type="primary", use_container_width=True):
-            if not ed_name:
-                st.error("Device name is required.")
-            else:
-                device.name            = ed_name
-                device.category        = ed_cat
-                device.model           = ed_model or None
-                device.serial_number   = ed_serial or None
-                device.purchase_date   = str(ed_pdate) if ed_pdate else None
-                device.warranty_expiry = str(ed_wexp) if ed_wexp else None
-                device.notes           = ed_notes or None
-                inv.update_device(device)
-                st.toast("Device updated.", icon="✅")
-                st.rerun()
+    st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+
+    # ── Metrics row: Total · YTD · Next Due · Last Service ────────────────────
+    m1, m2, m3, m4 = st.columns(4)
+    next_due_val = next_sched.next_due_date if next_sched else "—"
+    last_svc_val = last_svc.completion_date if last_svc else "—"
+    for col, label, value in [
+        (m1, "Total Spend",  _money(hist.total_cost(device.id))),
+        (m2, "YTD Spend",    _money(hist.total_cost_this_year(device.id))),
+        (m3, "Next Due",     next_due_val),
+        (m4, "Last Service", last_svc_val),
+    ]:
+        col.markdown(
+            f"<div class='hmt-spec-label'>{label}</div>"
+            f"<div class='hmt-spec-value'>{value}</div>",
+            unsafe_allow_html=True,
+        )
+
+    if device.notes:
+        st.markdown(
+            f"<div class='hmt-notes'><strong>Notes</strong><br>{device.notes}</div>",
+            unsafe_allow_html=True,
+        )
+
+    # ── Edit form (collapsed by default to reduce dialog clutter) ─────────────
+    with st.expander("✎ Edit device", expanded=False):
+        with st.form("device_detail_form"):
+            fa1, fa2 = st.columns(2)
+            ed_name   = fa1.text_input("Device name *", value=device.name)
+            ed_cat    = fa2.selectbox("Category *", CATEGORIES, index=CATEGORIES.index(device.category))
+            fb1, fb2  = st.columns(2)
+            ed_model  = fb1.text_input("Model", value=device.model or "")
+            ed_serial = fb2.text_input("Serial number", value=device.serial_number or "")
+            fc1, fc2  = st.columns(2)
+            try:    pd_val = date.fromisoformat(device.purchase_date) if device.purchase_date else None
+            except: pd_val = None
+            ed_pdate  = fc1.date_input("Purchase date", value=pd_val)
+            try:    we_val = date.fromisoformat(device.warranty_expiry) if device.warranty_expiry else None
+            except: we_val = None
+            ed_wexp   = fc2.date_input("Warranty expiry", value=we_val)
+            ed_notes  = st.text_area("Notes", value=device.notes or "", height=70)
+
+            if st.form_submit_button("Save Changes", type="primary", use_container_width=True):
+                if not ed_name:
+                    st.error("Device name is required.")
+                else:
+                    device.name            = ed_name
+                    device.category        = ed_cat
+                    device.model           = ed_model or None
+                    device.serial_number   = ed_serial or None
+                    device.purchase_date   = str(ed_pdate) if ed_pdate else None
+                    device.warranty_expiry = str(ed_wexp) if ed_wexp else None
+                    device.notes           = ed_notes or None
+                    inv.update_device(device)
+                    st.toast("Device updated.", icon="✅")
+                    st.rerun()
 
     # ── Service Types ──────────────────────────────────────────────────────────
     st.divider()
@@ -586,7 +716,8 @@ def _device_dialog(device: Device):
             st.caption("No maintenance history yet.")
 
     st.divider()
-    ga1, ga2, ga3 = st.columns([1, 1, 3])
+    confirm_key = f"dev_confirm_del_{device.id}"
+    ga1, ga2, _ = st.columns([1, 1, 3])
     with ga1:
         arch_label = "Restore" if device.is_archived else "Archive"
         if st.button(arch_label, key=f"dlg_arch_{device.id}", use_container_width=True):
@@ -595,7 +726,27 @@ def _device_dialog(device: Device):
             st.rerun()
     with ga2:
         if st.button("Delete", key=f"dlg_del_{device.id}", type="secondary", use_container_width=True):
-            _delete_dialog(device.name, "device", device.id)
+            st.session_state[confirm_key] = True
+            st.rerun()
+
+    if st.session_state.get(confirm_key):
+        with st.container(border=True):
+            st.markdown(
+                f"<div style='color:#991b1b;font-weight:600'>Delete {device.name}?</div>"
+                f"<div style='color:#7f1d1d;font-size:13px;margin-top:2px'>"
+                f"All linked maintenance history and schedules will also be deleted.</div>",
+                unsafe_allow_html=True,
+            )
+            cc1, cc2, _ = st.columns([1, 1, 3])
+            if cc1.button("Confirm Delete", key=f"dev_del_confirm_{device.id}",
+                          type="primary", use_container_width=True):
+                inv.delete_device(device.id)
+                st.session_state.pop(confirm_key, None)
+                st.rerun()
+            if cc2.button("Cancel", key=f"dev_del_cancel_{device.id}",
+                          use_container_width=True):
+                st.session_state.pop(confirm_key, None)
+                st.rerun()
 
 
 # ── Sidebar nav (design §2.1) ─────────────────────────────────────────────────
@@ -781,20 +932,18 @@ elif nav == "devices":
     )
 
     if devs:
-        hcols = st.columns([3, 2, 1, 1])
-        for col, label in zip(hcols, ["Name", "Category", "Spend", ""]):
-            col.markdown(f"<span style='font-size:0.75rem;text-transform:uppercase;color:#64748b;font-weight:600;letter-spacing:0.05em'>{label}</span>", unsafe_allow_html=True)
-        st.markdown("<hr style='margin:4px 0 8px'>", unsafe_allow_html=True)
-        for d in devs:
-            with st.container():
-                rc = st.columns([3, 2, 1, 1])
-                name_text = f"{'🗄 ' if d.is_archived else ''}{d.name}"
-                rc[0].markdown(f"**{name_text}**")
-                rc[1].markdown(f"<span style='font-size:0.85rem;color:#475569'>{d.category}</span>", unsafe_allow_html=True)
-                rc[2].markdown(f"<span style='font-size:0.85rem'>{_money(hist.total_cost(d.id))}</span>", unsafe_allow_html=True)
-                if rc[3].button("Open ↗", key=f"dev_open_{d.id}", use_container_width=True):
-                    _device_dialog(d)
-            st.markdown("<hr style='margin:2px 0;border-color:#f1f5f9'>", unsafe_allow_html=True)
+        # Pre-fetch all schedules once so each card can filter locally (avoids N queries)
+        all_schedules = sched.list_schedules(active_only=False)
+        sched_by_dev: dict = {}
+        for s in all_schedules:
+            sched_by_dev.setdefault(s.device_id, []).append(s)
+
+        COLS = 3
+        for i in range(0, len(devs), COLS):
+            row = st.columns(COLS)
+            for col, d in zip(row, devs[i:i + COLS]):
+                with col:
+                    _device_card(d, sched_by_dev.get(d.id, []))
     else:
         st.info("No devices found. Add your first device above.")
 
