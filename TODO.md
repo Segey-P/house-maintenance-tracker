@@ -2,11 +2,61 @@
 
 ## In Progress
 
-data gathering and testing
+UI redesign from `design_handoff/` — see DESIGN.md for full spec.
 
-## Next Up
+### Wave 0 — Drop-ins (done in this session)
+- [x] Theme tokens in `.streamlit/config.toml` (amber primary, warm off-white bg)
+- [x] DM Sans font + redesigned global CSS (cards, metrics, buttons, tabs)
+- [x] Rename tabs: Maintenance → History, Notifications → Integrations
+- [x] Remove "Coming Soon" block from Dashboard (moves to Roadmap view in Wave 5)
+- [x] Fix Google Calendar push crash (`dev.part_numbers` / `dev.resource_links` no longer exist on Device; pull from service type instead)
 
-- [ ] Download schedule as checklist (CSV or PDF export of upcoming tasks from Schedules tab)
+## Next Up — waiting on stack decision
+
+Before the remaining waves can proceed we need a call on how far to go with Streamlit:
+- **Option A** — stay in Streamlit, accept `@st.dialog` modals instead of right-edge slide-overs, visual parity ~80%.
+- **Option B** — build a custom HTML/JS Streamlit component for true slide-over panels (~1 day).
+- **Option C** — migrate the front-end to React (largest lift; matches design pixel-faithfully).
+
+### Wave 1 — Sidebar nav + shell
+- [ ] Replace `st.tabs` with sidebar-driven view picker (dark navy sidebar per design)
+- [ ] `src/ui.py` with `render_status_badge`, `render_stat_card`, shared helpers
+- [ ] User profile + Sign out in sidebar footer
+- [ ] Property switcher placeholder (chevron, static)
+
+### Wave 2 — Dashboard refactor
+- [ ] 4-card tinted stat row (Overdue red, Due-this-week amber)
+- [ ] Task groups (Needs Attention / Due This Week / Later This Month)
+- [ ] Inline ✓ Done + ⏭ Skip with expand-below quick-log form
+- [ ] Recent Activity as card list (5 entries)
+
+### Wave 3 — Devices redesign
+- [ ] Card grid (auto-fill, minmax 280px)
+- [ ] Dashed "+ Add Device" tile
+- [ ] Accent strip + status badge + category pill + warranty-expiring badge
+- [ ] Device dialog: 4×2 specs grid, amber notes block, nested service type cards
+- [ ] Inline delete confirmation (replace `_delete_dialog` for device)
+- [ ] Drop archive UI (keep DB column) — pending confirmation
+- [ ] Category spend on device cards
+
+### Wave 4 — History + Schedules refactor
+- [ ] History: flat card list, date/category/from-to filters, amber due-tasks banner with chip row
+- [ ] Schedules: urgency-grouped (Overdue / This Week / This Month / Later) with 🗓 Synced badge
+- [ ] Inline Pause/Resume on schedule rows
+
+### Wave 5 — AI + Integrations + Roadmap
+- [ ] Add `anthropic` to `requirements.txt`; `ANTHROPIC_API_KEY` in Streamlit secrets
+- [ ] `src/ai.py` wrapper (Claude Haiku 4.5 default; enable prompt caching on chat system context)
+- [ ] Find Parts + Find Tutorial buttons on each service type card
+- [ ] Dashboard AI Chat widget (context: devices, overdue, due-this-week)
+- [ ] Integrations: Connect/Disconnect pill + Synced/Unsynced tile counts
+- [ ] Account card (email — needs storage decision)
+- [ ] Roadmap view (Phase 1/2/3 checklist from DESIGN.md)
+
+### Wave 6 — Stretch
+- [ ] Custom slide-over panel component (true right-edge drawer)
+- [ ] Photo upload on Add Device (needs storage; Streamlit Cloud fs is ephemeral)
+- [ ] Download schedule as CSV/PDF checklist
 
 ## Backlog
 
@@ -14,6 +64,7 @@ data gathering and testing
 - [ ] Gemini CSV import — structured CSV format that Gemini can produce from a camera walkthrough, importable via the UI (devices + service types in one file). See `scripts/seed_data.sql` as schema reference.
 - [ ] IoT device detection integration
 - [ ] Auto-order replacement parts from Amazon when service is due
+- [ ] Unified `tasks` table (schedules + history combined) — v2 backend change
 
 ## Done
 

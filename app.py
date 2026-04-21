@@ -34,37 +34,93 @@ require_password()
 
 st.markdown("""
 <style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700;800&display=swap');
+
+html, body, [class*="st-"], button, input, textarea, select {
+    font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif !important;
+}
+
 /* Hide Streamlit chrome */
 #MainMenu, header, footer { visibility: hidden; }
-.block-container { padding-top: 1.5rem; padding-bottom: 2rem; }
+.block-container { padding-top: 1.5rem; padding-bottom: 2rem; max-width: 1100px; }
 
-/* Metric card borders */
+/* Headings */
+h1, h2, h3 { color: #1c1c1e; letter-spacing: -0.01em; }
+
+/* Metric cards — design §2.2 stat row */
 div[data-testid="metric-container"] {
-    background: #f8fafc;
-    border: 1px solid #e2e8f0;
-    border-radius: 10px;
-    padding: 1rem 1.25rem;
+    background: #ffffff;
+    border: 1px solid #e5e5e3;
+    border-radius: 12px;
+    padding: 16px 20px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.04);
 }
 div[data-testid="metric-container"] > label {
-    font-size: 0.8rem;
+    font-size: 11px;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: #64748b;
+    letter-spacing: 0.06em;
+    font-weight: 600;
+    color: #9ca3af;
 }
-div[data-testid="metric-container"] > div {
-    font-size: 1.8rem;
-    font-weight: 700;
+div[data-testid="metric-container"] [data-testid="stMetricValue"] {
+    font-size: 28px;
+    font-weight: 800;
+    color: #1c1c1e;
+    letter-spacing: -0.02em;
 }
 
-/* Tighter tab bar */
+/* Primary button — amber accent */
+.stButton > button[kind="primary"], .stDownloadButton > button[kind="primary"],
+.stFormSubmitButton > button[kind="primary"] {
+    background: #e8823a;
+    border-color: #e8823a;
+    color: #ffffff;
+    font-weight: 600;
+    border-radius: 8px;
+}
+.stButton > button[kind="primary"]:hover, .stDownloadButton > button[kind="primary"]:hover,
+.stFormSubmitButton > button[kind="primary"]:hover {
+    background: #d4722f;
+    border-color: #d4722f;
+    color: #ffffff;
+}
+
+/* Secondary / ghost buttons */
+.stButton > button[kind="secondary"], .stFormSubmitButton > button[kind="secondary"] {
+    background: #f8f7f5;
+    border: 1px solid #e5e5e3;
+    color: #374151;
+    font-weight: 600;
+    border-radius: 8px;
+}
+.stButton > button[kind="secondary"]:hover {
+    background: #f0f0ee;
+    border-color: #d1d5db;
+    color: #1c1c1e;
+}
+
+/* Tab bar */
 div[data-testid="stTabs"] > div:first-child button {
-    font-size: 0.9rem;
-    padding: 0.5rem 1rem;
+    font-size: 13px;
+    padding: 0.55rem 1.1rem;
+    font-weight: 600;
+}
+div[data-testid="stTabs"] > div:first-child button[aria-selected="true"] {
+    color: #e8823a;
 }
 
-/* Sidebar section headers */
-.sidebar-stat { font-size: 0.85rem; color: #64748b; margin: 0; }
-.sidebar-val  { font-size: 1rem; font-weight: 600; margin: 0 0 0.5rem; }
+/* Containers (bordered) — act as design's Card */
+div[data-testid="stVerticalBlockBorderWrapper"] {
+    border-radius: 12px !important;
+    border-color: #e5e5e3 !important;
+    background: #ffffff;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+}
+
+/* Sidebar */
+section[data-testid="stSidebar"] { background: #ffffff; }
+.sidebar-stat { font-size: 11px; color: #9ca3af; margin: 0; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; }
+.sidebar-val  { font-size: 17px; font-weight: 700; color: #1c1c1e; margin: 0 0 0.5rem; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -266,7 +322,7 @@ st.divider()
 
 # ── Tabs ──────────────────────────────────────────────────────────────────────
 
-tabs = st.tabs(["📊 Dashboard", "📱 Devices", "🔧 Maintenance", "📅 Schedules", "🔔 Notifications"])
+tabs = st.tabs(["📊 Dashboard", "📱 Devices", "🔧 History", "📅 Schedules", "🔔 Integrations"])
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -326,14 +382,6 @@ with tabs[0]:
             st.dataframe(df, hide_index=True, width=680)
         else:
             st.info("No maintenance history yet. Log your first task in the Maintenance tab.")
-
-    st.divider()
-    st.subheader("🚧 Coming Soon")
-    st.markdown("""
-- **Download schedule** — export upcoming tasks as a printable checklist
-- **Google Calendar sync** — push schedules as recurring calendar events
-- **Photo import** — identify appliance from photo, auto-fill specs
-""")
 
 
 
@@ -591,13 +639,13 @@ with tabs[1]:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# TAB 2 — MAINTENANCE
+# TAB 2 — HISTORY
 # ══════════════════════════════════════════════════════════════════════════════
 
 with tabs[2]:
     hh1, hh2 = st.columns([5, 1])
-    hh1.subheader("Maintenance")
-    if hh2.button("＋ Log Expense", type="primary", use_container_width=True, key="hist_add_toggle"):
+    hh1.subheader("Maintenance History")
+    if hh2.button("＋ Log Entry", type="primary", use_container_width=True, key="hist_add_toggle"):
         st.session_state.show_hist_add = not st.session_state.get("show_hist_add", False)
         st.session_state.pop("prefill_log", None)
 
@@ -858,11 +906,11 @@ with tabs[3]:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# TAB 4 — NOTIFICATIONS
+# TAB 4 — INTEGRATIONS
 # ══════════════════════════════════════════════════════════════════════════════
 
 with tabs[4]:
-    st.subheader("Notifications")
+    st.subheader("Integrations")
 
     # ── Google Calendar ───────────────────────────────────────────────────────
     cal_col, _ = st.columns(2)
@@ -889,11 +937,21 @@ with tabs[4]:
                         dev = inv.get_device(s.device_id)
                         if not dev:
                             continue
+                        # Part numbers + tutorial/purchase links live on the service type now,
+                        # not the device. Pull them from the schedule's service type if any.
+                        stype = svcs.get_service_type(s.service_type_id) if s.service_type_id else None
+                        resource_links = {}
+                        if stype:
+                            if stype.tutorial_url:
+                                resource_links["tutorial"] = stype.tutorial_url
+                            if stype.purchase_url:
+                                resource_links["purchase"] = stype.purchase_url
                         try:
                             eid = create_calendar_event(
                                 device_name=dev.name, task_description=s.task_description,
                                 due_date=s.next_due_date, frequency_days=s.frequency_days,
-                                part_numbers=dev.part_numbers, resource_links=dev.resource_links,
+                                part_numbers=stype.part_numbers if stype else [],
+                                resource_links=resource_links,
                                 notes=dev.notes,
                             )
                             sched.set_calendar_event_id(s.id, eid)

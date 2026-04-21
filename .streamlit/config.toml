@@ -1,9 +1,10 @@
 [theme]
-primaryColor      = "#2563eb"
-backgroundColor   = "#ffffff"
-secondaryBackgroundColor = "#f1f5f9"
-textColor         = "#1e293b"
-font              = "sans serif"
+# Design tokens — see design_handoff/DESIGN.md §2.2
+primaryColor              = "#e8823a"
+backgroundColor           = "#f8f7f5"
+secondaryBackgroundColor  = "#ffffff"
+textColor                 = "#1c1c1e"
+font                      = "sans serif"
 
 [server]
 headless          = true
