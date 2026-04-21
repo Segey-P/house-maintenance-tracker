@@ -117,10 +117,85 @@ div[data-testid="stVerticalBlockBorderWrapper"] {
     box-shadow: 0 1px 4px rgba(0,0,0,0.04);
 }
 
-/* Sidebar */
-section[data-testid="stSidebar"] { background: #ffffff; }
-.sidebar-stat { font-size: 11px; color: #9ca3af; margin: 0; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; }
-.sidebar-val  { font-size: 17px; font-weight: 700; color: #1c1c1e; margin: 0 0 0.5rem; }
+/* Sidebar — dark navy per design §2.1 */
+section[data-testid="stSidebar"] {
+    background: #13192b !important;
+    border-right: 1px solid #1e2a42;
+    width: 220px !important;
+    min-width: 220px !important;
+}
+section[data-testid="stSidebar"] > div { padding-top: 8px; }
+section[data-testid="stSidebar"] * { color: #e2e8f0; }
+section[data-testid="stSidebar"] hr,
+section[data-testid="stSidebar"] [data-testid="stHorizontalRule"] { border-color: #1e2a42 !important; background: #1e2a42 !important; }
+
+/* Sidebar buttons — nav items */
+section[data-testid="stSidebar"] .stButton > button {
+    background: transparent;
+    border: none;
+    color: #94a3b8 !important;
+    font-weight: 400;
+    font-size: 13px;
+    text-align: left;
+    justify-content: flex-start;
+    padding: 9px 12px;
+    border-radius: 8px;
+    width: 100%;
+    box-shadow: none;
+}
+section[data-testid="stSidebar"] .stButton > button:hover {
+    background: #1c2540;
+    color: #f1f5f9 !important;
+}
+section[data-testid="stSidebar"] .stButton > button[kind="primary"] {
+    background: #2a3659 !important;
+    color: #ffffff !important;
+    font-weight: 600;
+    border: none;
+}
+
+/* Property switcher block */
+.hmt-prop-switch {
+    margin: 8px 12px 12px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: #1c2540;
+    border: 1px solid #2a3659;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.hmt-prop-switch .icon {
+    width: 32px; height: 32px; border-radius: 8px; background: #e8823a;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    color: white; font-size: 16px; font-weight: 800;
+}
+.hmt-prop-switch .prop-name { font-size: 13px; font-weight: 700; color: #f1f5f9; line-height: 1.2; }
+.hmt-prop-switch .prop-sub  { font-size: 10px; color: #64748b; margin-top: 1px; }
+
+/* Sidebar footer user card */
+.hmt-user {
+    margin: 12px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: transparent;
+    display: flex; align-items: center; gap: 10px;
+    border-top: 1px solid #1e2a42;
+    padding-top: 14px;
+}
+.hmt-user .avatar {
+    width: 28px; height: 28px; border-radius: 50%; background: #2a3659;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700; color: #94a3b8; flex-shrink: 0;
+}
+.hmt-user .name { font-size: 12px; font-weight: 600; color: #e2e8f0; }
+.hmt-user .role { font-size: 10px; color: #475569; }
+
+/* Sidebar-level nav-count badge (for overdue) */
+.hmt-nav-badge {
+    background: #ef4444; color: #fff; font-size: 10px; font-weight: 700;
+    border-radius: 20px; padding: 1px 6px; margin-left: 4px;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -271,123 +346,8 @@ def _delete_dialog(label: str, entity: str, entity_id: int):
     if c2.button("Cancel", key="dlg_cancel", use_container_width=True):
         st.rerun()
 
-# ── Sidebar ───────────────────────────────────────────────────────────────────
 
-with st.sidebar:
-    st.markdown("## 🏠 Squamish Home")
-    st.caption(f"📅 {date.today().strftime('%B %d, %Y')}  ·  Squamish, BC")
-    st.divider()
-
-    _all_sched  = sched.list_schedules()
-    _overdue    = [s for s in _all_sched if days_until_due(s.next_due_date) < 0]
-    _due_week   = [s for s in _all_sched if 0 <= days_until_due(s.next_due_date) <= 7]
-    _all_devs   = inv.list_devices()
-
-    if _overdue:
-        st.error(f"⛔ {len(_overdue)} task(s) overdue")
-    elif _due_week:
-        st.warning(f"⚠️ {len(_due_week)} task(s) due this week")
-    else:
-        st.success("✅ All tasks on schedule")
-
-    st.divider()
-    st.markdown('<p class="sidebar-stat">Active devices</p>', unsafe_allow_html=True)
-    st.markdown(f'<p class="sidebar-val">{len(_all_devs)}</p>', unsafe_allow_html=True)
-    st.markdown('<p class="sidebar-stat">Total spend</p>', unsafe_allow_html=True)
-    st.markdown(f'<p class="sidebar-val">{_money(hist.total_cost())}</p>', unsafe_allow_html=True)
-
-    if _overdue:
-        st.divider()
-        st.markdown("**Overdue tasks**")
-        for s in _overdue:
-            d = abs(days_until_due(s.next_due_date))
-            st.markdown(f"• {s.device_name} · {d}d ago")
-
-    if _due_week:
-        st.divider()
-        st.markdown("**Due this week**")
-        for s in _due_week:
-            d = days_until_due(s.next_due_date)
-            label = "today" if d == 0 else f"in {d}d"
-            st.markdown(f"• {s.device_name} · {label}")
-
-    st.divider()
-    logout_button()
-
-# ── Page header ───────────────────────────────────────────────────────────────
-
-st.markdown("# 🏠 Squamish Home")
-st.caption("House Maintenance Tracker")
-st.divider()
-
-# ── Tabs ──────────────────────────────────────────────────────────────────────
-
-tabs = st.tabs(["📊 Dashboard", "📱 Devices", "🔧 History", "📅 Schedules", "🔔 Integrations"])
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# TAB 0 — DASHBOARD
-# ══════════════════════════════════════════════════════════════════════════════
-
-with tabs[0]:
-    devices     = inv.list_devices()
-    all_sched   = sched.list_schedules()
-    overdue     = [s for s in all_sched if days_until_due(s.next_due_date) < 0]
-    due_week    = [s for s in all_sched if 0 <= days_until_due(s.next_due_date) <= 7]
-    total_spend = hist.total_cost()
-
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Active Devices", len(devices))
-    c2.metric("Overdue", len(overdue),
-              delta=f"action needed" if overdue else None,
-              delta_color="inverse")
-    c3.metric("Due This Week", len(due_week),
-              delta=f"upcoming" if due_week else None,
-              delta_color="off")
-    c4.metric("Spent This Year", _money(hist.total_cost_this_year()))
-
-    st.divider()
-    col_l, col_r = st.columns(2)
-
-    with col_l:
-        st.subheader("Upcoming Tasks")
-        upcoming = sched.get_due_schedules(days_ahead=60) or all_sched[:8]
-        if upcoming:
-            df = pd.DataFrame([
-                {
-                    "Device":   s.device_name,
-                    "Task":     s.task_description,
-                    "Due":      s.next_due_date,
-                    "Status":   _status(days_until_due(s.next_due_date)),
-                }
-                for s in upcoming[:10]
-            ])
-            st.dataframe(_style_schedule(df), hide_index=True, width=680)
-        else:
-            st.info("No upcoming tasks in the next 60 days.")
-
-    with col_r:
-        st.subheader("Recent Activity")
-        logs = hist.list_logs(limit=8)
-        if logs:
-            df = pd.DataFrame([
-                {
-                    "Date":   l.completion_date,
-                    "Device": l.device_name,
-                    "Task":   l.task_performed,
-                    "Cost":   _money(l.cost_cad),
-                }
-                for l in logs
-            ])
-            st.dataframe(df, hide_index=True, width=680)
-        else:
-            st.info("No maintenance history yet. Log your first task in the Maintenance tab.")
-
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# TAB 1 — DEVICES
-# ══════════════════════════════════════════════════════════════════════════════
+# ── Device dialog ─────────────────────────────────────────────────────────────
 
 @st.dialog("Device Details", width="large")
 def _device_dialog(device: Device):
@@ -559,7 +519,123 @@ def _device_dialog(device: Device):
             _delete_dialog(device.name, "device", device.id)
 
 
-with tabs[1]:
+# ── Sidebar nav (design §2.1) ─────────────────────────────────────────────────
+
+NAV_ITEMS = [
+    ("dashboard",    "⌂ Dashboard"),
+    ("devices",      "⊞ Devices"),
+    ("history",      "⚙ History"),
+    ("schedules",    "◷ Schedules"),
+    ("integrations", "◉ Integrations"),
+    ("roadmap",      "◈ Roadmap"),
+]
+
+if "nav" not in st.session_state:
+    st.session_state.nav = "dashboard"
+
+_all_sched_sidebar = sched.list_schedules()
+_overdue_count = sum(1 for s in _all_sched_sidebar if days_until_due(s.next_due_date) < 0)
+
+with st.sidebar:
+    st.markdown(
+        '<div class="hmt-prop-switch">'
+        '<div class="icon">🏠</div>'
+        '<div><div class="prop-name">Squamish Home</div>'
+        '<div class="prop-sub">Squamish, BC</div></div>'
+        '</div>',
+        unsafe_allow_html=True,
+    )
+
+    for view_id, label in NAV_ITEMS:
+        is_active = st.session_state.nav == view_id
+        suffix = f"  ({_overdue_count})" if view_id == "dashboard" and _overdue_count else ""
+        if st.button(
+            label + suffix,
+            key=f"nav_{view_id}",
+            type="primary" if is_active else "secondary",
+            use_container_width=True,
+        ):
+            st.session_state.nav = view_id
+            st.rerun()
+
+    st.markdown("<div style='flex:1'></div>", unsafe_allow_html=True)
+    st.markdown(
+        '<div class="hmt-user">'
+        '<div class="avatar">S</div>'
+        '<div><div class="name">Sergey P.</div>'
+        '<div class="role">Owner</div></div>'
+        '</div>',
+        unsafe_allow_html=True,
+    )
+    logout_button()
+
+nav = st.session_state.nav
+
+# ══════════════════════════════════════════════════════════════════════════════
+# VIEW — DASHBOARD
+# ══════════════════════════════════════════════════════════════════════════════
+
+if nav == "dashboard":
+    devices     = inv.list_devices()
+    all_sched   = sched.list_schedules()
+    overdue     = [s for s in all_sched if days_until_due(s.next_due_date) < 0]
+    due_week    = [s for s in all_sched if 0 <= days_until_due(s.next_due_date) <= 7]
+    total_spend = hist.total_cost()
+
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Active Devices", len(devices))
+    c2.metric("Overdue", len(overdue),
+              delta=f"action needed" if overdue else None,
+              delta_color="inverse")
+    c3.metric("Due This Week", len(due_week),
+              delta=f"upcoming" if due_week else None,
+              delta_color="off")
+    c4.metric("Spent This Year", _money(hist.total_cost_this_year()))
+
+    st.divider()
+    col_l, col_r = st.columns(2)
+
+    with col_l:
+        st.subheader("Upcoming Tasks")
+        upcoming = sched.get_due_schedules(days_ahead=60) or all_sched[:8]
+        if upcoming:
+            df = pd.DataFrame([
+                {
+                    "Device":   s.device_name,
+                    "Task":     s.task_description,
+                    "Due":      s.next_due_date,
+                    "Status":   _status(days_until_due(s.next_due_date)),
+                }
+                for s in upcoming[:10]
+            ])
+            st.dataframe(_style_schedule(df), hide_index=True, width=680)
+        else:
+            st.info("No upcoming tasks in the next 60 days.")
+
+    with col_r:
+        st.subheader("Recent Activity")
+        logs = hist.list_logs(limit=8)
+        if logs:
+            df = pd.DataFrame([
+                {
+                    "Date":   l.completion_date,
+                    "Device": l.device_name,
+                    "Task":   l.task_performed,
+                    "Cost":   _money(l.cost_cad),
+                }
+                for l in logs
+            ])
+            st.dataframe(df, hide_index=True, width=680)
+        else:
+            st.info("No maintenance history yet. Log your first task in the Maintenance tab.")
+
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# VIEW — DEVICES
+# ══════════════════════════════════════════════════════════════════════════════
+
+elif nav == "devices":
     ih1, ih2 = st.columns([5, 1])
     ih1.subheader("Devices")
     if ih2.button("＋ Add Device", type="primary", use_container_width=True, key="inv_add_toggle"):
@@ -639,10 +715,10 @@ with tabs[1]:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# TAB 2 — HISTORY
+# VIEW — HISTORY
 # ══════════════════════════════════════════════════════════════════════════════
 
-with tabs[2]:
+elif nav == "history":
     hh1, hh2 = st.columns([5, 1])
     hh1.subheader("Maintenance History")
     if hh2.button("＋ Log Entry", type="primary", use_container_width=True, key="hist_add_toggle"):
@@ -811,10 +887,10 @@ with tabs[2]:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# TAB 3 — SCHEDULES
+# VIEW — SCHEDULES
 # ══════════════════════════════════════════════════════════════════════════════
 
-with tabs[3]:
+elif nav == "schedules":
     sh1, sh2 = st.columns([5, 1])
     sh1.subheader("Maintenance Schedules")
     if sh2.button("＋ Add Manual", type="secondary", use_container_width=True, key="sched_add_toggle"):
@@ -906,10 +982,10 @@ with tabs[3]:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# TAB 4 — INTEGRATIONS
+# VIEW — INTEGRATIONS
 # ══════════════════════════════════════════════════════════════════════════════
 
-with tabs[4]:
+elif nav == "integrations":
     st.subheader("Integrations")
 
     # ── Google Calendar ───────────────────────────────────────────────────────
@@ -966,3 +1042,52 @@ with tabs[4]:
                 st.rerun()
 
     # TODO: download schedule as a checklist (PDF or CSV export of upcoming tasks)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# VIEW — ROADMAP
+# ══════════════════════════════════════════════════════════════════════════════
+
+elif nav == "roadmap":
+    st.subheader("Roadmap")
+    st.caption("Where the Tracker is heading. Source of truth: `design_handoff/DESIGN.md §7`.")
+
+    _phases = [
+        ("Phase 1 — Now",    "#15803d", "#f0fdf4", [
+            ("Device inventory with service types",     True),
+            ("Maintenance history log",                 True),
+            ("Schedule management",                     True),
+            ("Google Calendar sync",                    True),
+        ]),
+        ("Phase 2 — Next",   "#2563eb", "#eff6ff", [
+            ("AI-powered parts finder",                 False),
+            ("AI-powered tutorial finder",              False),
+            ("Dashboard AI chat assistant",             False),
+            ("Photo upload → AI device identification", False),
+            ("Amazon.ca parts linking (with referral)", False),
+            ("Spend analytics & cost projections",      False),
+            ("Download schedule as CSV/PDF",            False),
+        ]),
+        ("Phase 3 — Future", "#7c3aed", "#f5f3ff", [
+            ("Multi-unit / building manager mode",      False),
+            ("Shared maintenance templates per unit",   False),
+            ("Individual unit owner accounts",          False),
+            ("Service provider booking",                False),
+        ]),
+    ]
+
+    for label, color, bg, features in _phases:
+        with st.container(border=True):
+            st.markdown(
+                f'<span style="font-size:11px;font-weight:700;padding:3px 10px;'
+                f'border-radius:20px;background:{bg};color:{color};">{label}</span>',
+                unsafe_allow_html=True,
+            )
+            for name, done in features:
+                icon = "✅" if done else "◯"
+                color_txt = "#1c1c1e" if done else "#6b7280"
+                st.markdown(
+                    f'<div style="font-size:13px;color:{color_txt};padding:4px 0;">'
+                    f'{icon} {name}</div>',
+                    unsafe_allow_html=True,
+                )
