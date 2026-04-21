@@ -22,11 +22,11 @@ Stack decision: **Option A** — Streamlit + `@st.dialog` modals (~80% visual pa
 - [x] Property switcher placeholder (static Squamish Home)
 - [x] Roadmap view stub (Phase 1/2/3 from DESIGN.md)
 
-### Wave 2 — Dashboard refactor
-- [ ] 4-card tinted stat row (Overdue red, Due-this-week amber)
-- [ ] Task groups (Needs Attention / Due This Week / Later This Month)
-- [ ] Inline ✓ Done + ⏭ Skip with expand-below quick-log form
-- [ ] Recent Activity as card list (5 entries)
+### Wave 2 — Dashboard refactor (done)
+- [x] 4-card tinted stat row (Overdue red, Due-this-week amber)
+- [x] Task groups (Needs Attention / Due This Week / Later This Month)
+- [x] Inline ✓ Done + ⏭ Skip + ⏸ Pause with expand-below quick-log form
+- [x] Recent Activity as card list (5 entries)
 
 ### Wave 3 — Devices redesign
 - [ ] Card grid (auto-fill, minmax 280px)

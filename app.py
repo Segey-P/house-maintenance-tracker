@@ -15,6 +15,7 @@ from src import scheduler as sched
 from src import services as svcs
 from src.models import Device, MaintenanceLog, Schedule, ServiceType
 from src.scheduler import days_until_due
+from src.ui import badge_html, stat_card_html, status_info
 from utils.auth import logout_button, require_password
 
 CATEGORIES = ["Major Appliances", "Kitchen Appliances", "Laundry Systems", "Plumbing & Water", "Safety & Electrical"]
@@ -231,6 +232,84 @@ def _style_schedule(df: pd.DataFrame):
             return ["background-color: #fefce8"] * len(row)
         return [""] * len(row)
     return df.style.apply(row_bg, axis=1)
+
+
+def _dash_task_group(label: str, schedules: list) -> None:
+    """Dashboard task group — design §3 Needs-Attention / Due-Week / Later-Month."""
+    if not schedules:
+        return
+    st.markdown(
+        f"<h4 style='margin:18px 0 10px;color:#1c1c1e;font-size:14px;"
+        f"text-transform:uppercase;letter-spacing:0.06em;font-weight:700;'>"
+        f"{label}  <span style='color:#9ca3af;font-weight:500'>({len(schedules)})</span></h4>",
+        unsafe_allow_html=True,
+    )
+    for s in schedules:
+        days  = days_until_due(s.next_due_date)
+        sinfo = status_info(days)
+        with st.container(border=True):
+            top1, top2 = st.columns([5, 3])
+            top1.markdown(
+                f"<div style='font-size:11px;color:#9ca3af;text-transform:uppercase;"
+                f"letter-spacing:0.04em;font-weight:600'>{s.device_name}</div>"
+                f"<div style='font-size:15px;font-weight:600;color:#1c1c1e;margin-top:2px'>"
+                f"{s.task_description}</div>",
+                unsafe_allow_html=True,
+            )
+            top2.markdown(
+                f"<div style='text-align:right'>"
+                + badge_html(sinfo["status"], sinfo["label"])
+                + f"<div style='font-size:12px;color:#6b7280;margin-top:4px'>"
+                f"Due {s.next_due_date}</div></div>",
+                unsafe_allow_html=True,
+            )
+
+            log_key = f"dash_log_{s.id}"
+            b1, b2, b3, _pad = st.columns([1, 1, 1, 3])
+            if b1.button("✓ Done", key=f"dash_done_{s.id}", type="primary",
+                         use_container_width=True):
+                st.session_state[log_key] = True
+                st.rerun()
+            if b2.button("⏭ Skip", key=f"dash_skip_{s.id}", use_container_width=True):
+                new_date = sched.advance_schedule(s.id)
+                st.toast(f"Skipped — next due {new_date}", icon="⏭")
+                st.rerun()
+            if b3.button("⏸ Pause", key=f"dash_pause_{s.id}", use_container_width=True):
+                sched.deactivate_schedule(s.id)
+                st.toast("Schedule paused.", icon="⏸")
+                st.rerun()
+
+            if st.session_state.get(log_key):
+                with st.form(f"dash_log_form_{s.id}", clear_on_submit=True, border=True):
+                    st.markdown(f"**Log completion — {s.task_description}**")
+                    la1, la2 = st.columns(2)
+                    ld_date = la1.date_input("Completion date", value=date.today(),
+                                             key=f"dash_log_date_{s.id}")
+                    ld_cost = la2.number_input("Cost (CAD)", min_value=0.0, value=0.0,
+                                               step=0.01, format="%.2f",
+                                               key=f"dash_log_cost_{s.id}")
+                    ld_notes = st.text_area("Notes", height=60, key=f"dash_log_notes_{s.id}")
+                    lb1, lb2 = st.columns(2)
+                    l_sub = lb1.form_submit_button("Save & Advance", type="primary",
+                                                   use_container_width=True)
+                    l_can = lb2.form_submit_button("Cancel", use_container_width=True)
+
+                if l_sub:
+                    hist.add_log(MaintenanceLog(
+                        device_id=s.device_id,
+                        service_type_id=s.service_type_id,
+                        task_performed=s.task_description,
+                        completion_date=str(ld_date),
+                        cost_cad=float(ld_cost),
+                        notes=ld_notes or None,
+                    ))
+                    new_date = sched.advance_schedule(s.id)
+                    st.session_state.pop(log_key, None)
+                    st.toast(f"Logged — next due {new_date}", icon="✅")
+                    st.rerun()
+                if l_can:
+                    st.session_state.pop(log_key, None)
+                    st.rerun()
 
 # ── Log-entry dialog ──────────────────────────────────────────────────────────
 
@@ -576,58 +655,64 @@ nav = st.session_state.nav
 # ══════════════════════════════════════════════════════════════════════════════
 
 if nav == "dashboard":
-    devices     = inv.list_devices()
-    all_sched   = sched.list_schedules()
-    overdue     = [s for s in all_sched if days_until_due(s.next_due_date) < 0]
-    due_week    = [s for s in all_sched if 0 <= days_until_due(s.next_due_date) <= 7]
-    total_spend = hist.total_cost()
+    devices   = inv.list_devices()
+    active    = sched.list_schedules()  # active_only=True by default
+    overdue   = sorted([s for s in active if days_until_due(s.next_due_date) < 0],
+                       key=lambda s: days_until_due(s.next_due_date))
+    due_today = [s for s in active if days_until_due(s.next_due_date) == 0]
+    due_week  = sorted([s for s in active if 1 <= days_until_due(s.next_due_date) <= 7],
+                       key=lambda s: days_until_due(s.next_due_date))
+    due_month = sorted([s for s in active if 7 < days_until_due(s.next_due_date) <= 30],
+                       key=lambda s: days_until_due(s.next_due_date))
+    this_week_count = len(overdue) + len(due_today) + len(due_week)
 
+    # ── Stat row (design §3, tinted for urgency) ──────────────────────────────
     c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Active Devices", len(devices))
-    c2.metric("Overdue", len(overdue),
-              delta=f"action needed" if overdue else None,
-              delta_color="inverse")
-    c3.metric("Due This Week", len(due_week),
-              delta=f"upcoming" if due_week else None,
-              delta_color="off")
-    c4.metric("Spent This Year", _money(hist.total_cost_this_year()))
+    c1.markdown(stat_card_html("Active Devices", str(len(devices))),
+                unsafe_allow_html=True)
+    c2.markdown(stat_card_html("Overdue", str(len(overdue)),
+                               tone="danger" if overdue else "neutral"),
+                unsafe_allow_html=True)
+    c3.markdown(stat_card_html("Due This Week", str(len(due_today) + len(due_week)),
+                               tone="warn" if (due_today or due_week) else "neutral"),
+                unsafe_allow_html=True)
+    c4.markdown(stat_card_html("Spent This Year", _money(hist.total_cost_this_year())),
+                unsafe_allow_html=True)
 
-    st.divider()
-    col_l, col_r = st.columns(2)
+    st.markdown("<div style='height:22px'></div>", unsafe_allow_html=True)
+
+    col_l, col_r = st.columns([3, 2])
 
     with col_l:
-        st.subheader("Upcoming Tasks")
-        upcoming = sched.get_due_schedules(days_ahead=60) or all_sched[:8]
-        if upcoming:
-            df = pd.DataFrame([
-                {
-                    "Device":   s.device_name,
-                    "Task":     s.task_description,
-                    "Due":      s.next_due_date,
-                    "Status":   _status(days_until_due(s.next_due_date)),
-                }
-                for s in upcoming[:10]
-            ])
-            st.dataframe(_style_schedule(df), hide_index=True, width=680)
+        if not (overdue or due_today or due_week or due_month):
+            st.info("No tasks due in the next 30 days. 🎉")
         else:
-            st.info("No upcoming tasks in the next 60 days.")
+            _dash_task_group("Needs Attention", overdue + due_today)
+            _dash_task_group("Due This Week",   due_week)
+            _dash_task_group("Later This Month", due_month)
 
     with col_r:
-        st.subheader("Recent Activity")
-        logs = hist.list_logs(limit=8)
-        if logs:
-            df = pd.DataFrame([
-                {
-                    "Date":   l.completion_date,
-                    "Device": l.device_name,
-                    "Task":   l.task_performed,
-                    "Cost":   _money(l.cost_cad),
-                }
-                for l in logs
-            ])
-            st.dataframe(df, hide_index=True, width=680)
+        st.markdown(
+            "<h4 style='margin:0 0 12px;font-size:14px;text-transform:uppercase;"
+            "letter-spacing:0.06em;font-weight:700;color:#1c1c1e'>Recent Activity</h4>",
+            unsafe_allow_html=True,
+        )
+        logs = hist.list_logs(limit=5)
+        if not logs:
+            st.caption("No maintenance history yet.")
         else:
-            st.info("No maintenance history yet. Log your first task in the Maintenance tab.")
+            for l in logs:
+                with st.container(border=True):
+                    st.markdown(
+                        f"<div style='font-size:11px;color:#9ca3af;font-weight:600;"
+                        f"text-transform:uppercase;letter-spacing:0.04em'>{l.completion_date}</div>"
+                        f"<div style='font-size:14px;font-weight:600;color:#1c1c1e;"
+                        f"margin:2px 0 1px'>{l.device_name}</div>"
+                        f"<div style='font-size:13px;color:#4b5563'>{l.task_performed}</div>"
+                        f"<div style='font-size:13px;color:#e8823a;font-weight:700;"
+                        f"margin-top:4px'>{_money(l.cost_cad) if l.cost_cad else '—'}</div>",
+                        unsafe_allow_html=True,
+                    )
 
 
 
