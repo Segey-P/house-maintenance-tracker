@@ -11,18 +11,16 @@ UI redesign from `design_handoff/` — see DESIGN.md for full spec.
 - [x] Remove "Coming Soon" block from Dashboard (moves to Roadmap view in Wave 5)
 - [x] Fix Google Calendar push crash (`dev.part_numbers` / `dev.resource_links` no longer exist on Device; pull from service type instead)
 
-## Next Up — waiting on stack decision
+## Next Up
 
-Before the remaining waves can proceed we need a call on how far to go with Streamlit:
-- **Option A** — stay in Streamlit, accept `@st.dialog` modals instead of right-edge slide-overs, visual parity ~80%.
-- **Option B** — build a custom HTML/JS Streamlit component for true slide-over panels (~1 day).
-- **Option C** — migrate the front-end to React (largest lift; matches design pixel-faithfully).
+Stack decision: **Option A** — Streamlit + `@st.dialog` modals (~80% visual parity). Archive feature stays in DB + UI (design's removal treated as a design error). Anthropic API approved for Wave 5.
 
-### Wave 1 — Sidebar nav + shell
-- [ ] Replace `st.tabs` with sidebar-driven view picker (dark navy sidebar per design)
-- [ ] `src/ui.py` with `render_status_badge`, `render_stat_card`, shared helpers
-- [ ] User profile + Sign out in sidebar footer
-- [ ] Property switcher placeholder (chevron, static)
+### Wave 1 — Sidebar nav + shell (done)
+- [x] Replace `st.tabs` with sidebar-driven view picker (dark navy sidebar per design)
+- [x] `src/ui.py` with `status_info`, `badge_html`, `stat_card_html` helpers
+- [x] User profile + Sign out in sidebar footer
+- [x] Property switcher placeholder (static Squamish Home)
+- [x] Roadmap view stub (Phase 1/2/3 from DESIGN.md)
 
 ### Wave 2 — Dashboard refactor
 - [ ] 4-card tinted stat row (Overdue red, Due-this-week amber)
@@ -36,8 +34,8 @@ Before the remaining waves can proceed we need a call on how far to go with Stre
 - [ ] Accent strip + status badge + category pill + warranty-expiring badge
 - [ ] Device dialog: 4×2 specs grid, amber notes block, nested service type cards
 - [ ] Inline delete confirmation (replace `_delete_dialog` for device)
-- [ ] Drop archive UI (keep DB column) — pending confirmation
 - [ ] Category spend on device cards
+- Archive: keep in both DB and UI (design's removal = design error)
 
 ### Wave 4 — History + Schedules refactor
 - [ ] History: flat card list, date/category/from-to filters, amber due-tasks banner with chip row

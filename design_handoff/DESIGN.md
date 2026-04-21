@@ -1,7 +1,9 @@
 # House Maintenance Tracker — Design Reference
 
-> Last updated: April 20, 2026
+> Last updated: April 21, 2026
 > Based on design iteration session in Claude Projects.
+>
+> **Implementation path: Option A** — design realised in Streamlit with `@st.dialog` modals standing in for right-edge slide-over panels (~80% visual parity). The React prototypes in `hmt-shared.jsx` / `hmt-app.jsx` remain the visual reference only — the live app is `app.py`.
 
 ---
 
@@ -17,9 +19,10 @@ Future state: property managers onboard buildings, create "typical maintenance p
 
 ### 2.1 Navigation
 - **Left sidebar** (not top tabs) — scales better as features grow; supports future property/unit switcher at the top of the nav
-- Nav items: Dashboard · Devices · History · Schedules · Alerts
-- Sidebar footer: user profile access + logout (not date/location)
+- Nav items: Dashboard · Devices · History · Schedules · Integrations · Roadmap
+- Sidebar footer: user profile card + Sign out button
 - Active item: highlighted with `#2a3659` background on dark `#13192b` sidebar
+- Property switcher placeholder sits above the nav list (static "Squamish Home" until multi-property lands in Phase 4)
 
 ### 2.2 Visual Language
 | Token | Value |
@@ -88,10 +91,14 @@ Cards use a left `border` accent in the status dot colour when a task is overdue
 - Pause / Resume toggle per schedule
 - Calendar sync badge (🗓 Synced) shown inline
 
-### Alerts
-- Google Calendar integration: setup/connect area + push button, linked vs. pending count
-- Email alerts: day-window slider, preview count, send button
-- AI Assistant card (Coming Soon) — described as a proactive, chat-based assistant
+### Integrations (formerly Alerts)
+- Google Calendar: target selector (all or single device), push button, force re-create toggle, live linked / not-yet-pushed counts
+- Email alerts removed from scope (confirmed out of MVP)
+- Future tiles: Gemini CSV import (walkthrough-to-inventory), IoT auto-detection, Amazon.ca auto-order
+
+### Roadmap (new view)
+- Three phase cards (Phase 1 Now / Phase 2 Next / Phase 3 Future) rendered from the same checklist as §7 below
+- Purpose: single surface for communicating what ships next without leaving the app — replaces the removed "Coming Soon" block on the dashboard
 
 ---
 
@@ -144,23 +151,41 @@ This is a **v2 data model change** — the current Streamlit backend would need 
 
 ### Phase 1 — Current (Streamlit MVP)
 - [x] Device inventory CRUD
+- [x] Service types split out of Device model
 - [x] Maintenance history log
 - [x] Schedule management
-- [x] Google Calendar push
-- [x] Email alerts
+- [x] Google Calendar push (service-type-aware parts + links)
 - [x] CLI interface
+- [x] Postgres (Neon) storage, bcrypt password gate, Streamlit Cloud deploy
+- [x] Email alerts removed from scope
 
-### Phase 2 — UI Redesign (this session)
-- [x] Full React prototype with sidebar nav
-- [x] Action-first dashboard with inline task completion
-- [x] AI chat assistant on dashboard
-- [x] AI Find Parts / Find Tutorial per service type
-- [x] Service type detail panel with edit + history
-- [x] Device slide-over panel
-- [ ] User profile + logout in sidebar
+### Phase 2 — UI Redesign (in flight — Option A, Streamlit)
+**Wave 0 shipped**
+- [x] Theme tokens (amber primary, warm off-white bg, DM Sans)
+- [x] Tab rename (Maintenance → History, Notifications → Integrations)
+- [x] Removed Coming Soon block from Dashboard
+- [x] Fixed Calendar push bug (part numbers / resource links pulled from service type)
+
+**Wave 1 shipped**
+- [x] Sidebar nav replaces `st.tabs` (dark navy, amber-accented active state)
+- [x] `src/ui.py` with status_info / badge_html / stat_card_html helpers
+- [x] User profile + Sign out in sidebar footer
+- [x] Property switcher placeholder
+- [x] Roadmap view scaffold (Phase 1/2/3 cards)
+
+**Waves 2–5 open**
+- [ ] Dashboard refactor (stat tint row, task groups, inline ✓ Done / ⏭ Skip, Recent Activity card list)
+- [ ] Devices redesign (card grid, redesigned dialog, nested service-type cards)
+- [ ] History + Schedules refactor (flat card lists, urgency grouping, inline Pause/Resume)
+- [ ] AI wiring (`anthropic` dependency, Find Parts, Find Tutorial, Dashboard Chat)
+- [ ] Integrations visual refresh (Connect/Disconnect pill + synced/unsynced tile counts)
 - [ ] Add Device flow with photo upload placeholder
 - [ ] Mandatory/optional field labels on all forms
 - [ ] Category spend on device cards
+
+**Option A deltas from the prototype**
+- Right-edge slide-overs → centred `@st.dialog` modals (Wave 6 may replace with a custom slide-over component)
+- Archive **kept** in both DB and UI — the design's removal of archive is treated as a design error
 
 ### Phase 3 — AI & Automation
 - [ ] Photo → AI appliance identification (Add Device flow)
