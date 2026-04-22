@@ -56,7 +56,7 @@ User flagged: think through these features in more detail before implementing. R
 ### Wave 6 — Stretch
 - [ ] Custom slide-over panel component (true right-edge drawer)
 - [ ] Photo upload on Add Device (needs storage; Streamlit Cloud fs is ephemeral)
-- [ ] Download schedule as CSV/PDF checklist
+- [x] Download schedule as CSV/PDF checklist (CSV ⬇ button in Schedules header)
 
 ### Known UI gaps (live app)
 - [ ] **Browser-test every wave.** The fixes so far have all been pushed without a live browser verification (sandbox has no Streamlit). This already bit us twice with the sidebar/header CSS. Before merging the next wave, run `streamlit run app.py` somewhere with a browser.

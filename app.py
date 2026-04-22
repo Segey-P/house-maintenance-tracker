@@ -1177,10 +1177,26 @@ elif nav == "history":
 # ══════════════════════════════════════════════════════════════════════════════
 
 elif nav == "schedules":
-    sh1, sh2 = st.columns([5, 1])
+    _csv_scheds = sched.list_schedules(active_only=False)
+    _csv_data = pd.DataFrame([{
+        "Device": s.device_name,
+        "Task": s.task_description,
+        "Frequency (days)": s.frequency_days,
+        "Next Due": s.next_due_date,
+        "Days Until Due": days_until_due(s.next_due_date),
+        "Active": "Yes" if s.is_active else "No",
+        "Calendar Synced": "Yes" if s.calendar_event_id else "No",
+    } for s in sorted(_csv_scheds, key=lambda x: x.next_due_date)]).to_csv(index=False)
+
+    sh1, sh2, sh3 = st.columns([4, 1, 1])
     sh1.subheader("Maintenance Schedules")
     if sh2.button("＋ Add Manual", type="secondary", use_container_width=True, key="sched_add_toggle"):
         st.session_state.show_sched_add = not st.session_state.get("show_sched_add", False)
+    sh3.download_button(
+        "⬇ CSV", data=_csv_data,
+        file_name=f"schedules-{date.today()}.csv",
+        mime="text/csv", use_container_width=True, key="sched_csv_dl",
+    )
 
     if st.session_state.get("show_sched_add"):
         with st.container(border=True):
@@ -1350,7 +1366,6 @@ elif nav == "integrations":
                     st.warning(f"Pushed {pushed}, failed {errors}.")
                 st.rerun()
 
-    # TODO: download schedule as a checklist (PDF or CSV export of upcoming tasks)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1375,7 +1390,7 @@ elif nav == "roadmap":
             ("Photo upload → AI device identification", False),
             ("Amazon.ca parts linking (with referral)", False),
             ("Spend analytics & cost projections",      False),
-            ("Download schedule as CSV/PDF",            False),
+            ("Download schedule as CSV/PDF",            True),
         ]),
         ("Phase 3 — Future", "#7c3aed", "#f5f3ff", [
             ("Multi-unit / building manager mode",      False),
