@@ -15,6 +15,7 @@ from src import scheduler as sched
 from src import services as svcs
 from src.models import Device, MaintenanceLog, Schedule, ServiceType
 from src.scheduler import days_until_due
+from src.ui import STATUS_STYLES, badge_html, stat_card_html, status_info
 from utils.auth import logout_button, require_password
 
 CATEGORIES = ["Major Appliances", "Kitchen Appliances", "Laundry Systems", "Plumbing & Water", "Safety & Electrical"]
@@ -34,37 +35,191 @@ require_password()
 
 st.markdown("""
 <style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700;800&display=swap');
+
+html, body, [class*="st-"], button, input, textarea, select {
+    font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif !important;
+}
+
 /* Hide Streamlit chrome */
 #MainMenu, header, footer { visibility: hidden; }
-.block-container { padding-top: 1.5rem; padding-bottom: 2rem; }
+.block-container { padding-top: 1.5rem; padding-bottom: 2rem; max-width: 1100px; }
 
-/* Metric card borders */
+/* Headings */
+h1, h2, h3 { color: #1c1c1e; letter-spacing: -0.01em; }
+
+/* Metric cards — design §2.2 stat row */
 div[data-testid="metric-container"] {
-    background: #f8fafc;
-    border: 1px solid #e2e8f0;
-    border-radius: 10px;
-    padding: 1rem 1.25rem;
+    background: #ffffff;
+    border: 1px solid #e5e5e3;
+    border-radius: 12px;
+    padding: 16px 20px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.04);
 }
 div[data-testid="metric-container"] > label {
-    font-size: 0.8rem;
+    font-size: 11px;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: #64748b;
+    letter-spacing: 0.06em;
+    font-weight: 600;
+    color: #9ca3af;
 }
-div[data-testid="metric-container"] > div {
-    font-size: 1.8rem;
-    font-weight: 700;
+div[data-testid="metric-container"] [data-testid="stMetricValue"] {
+    font-size: 28px;
+    font-weight: 800;
+    color: #1c1c1e;
+    letter-spacing: -0.02em;
 }
 
-/* Tighter tab bar */
+/* Primary button — amber accent */
+.stButton > button[kind="primary"], .stDownloadButton > button[kind="primary"],
+.stFormSubmitButton > button[kind="primary"] {
+    background: #e8823a;
+    border-color: #e8823a;
+    color: #ffffff;
+    font-weight: 600;
+    border-radius: 8px;
+}
+.stButton > button[kind="primary"]:hover, .stDownloadButton > button[kind="primary"]:hover,
+.stFormSubmitButton > button[kind="primary"]:hover {
+    background: #d4722f;
+    border-color: #d4722f;
+    color: #ffffff;
+}
+
+/* Secondary / ghost buttons */
+.stButton > button[kind="secondary"], .stFormSubmitButton > button[kind="secondary"] {
+    background: #f8f7f5;
+    border: 1px solid #e5e5e3;
+    color: #374151;
+    font-weight: 600;
+    border-radius: 8px;
+}
+.stButton > button[kind="secondary"]:hover {
+    background: #f0f0ee;
+    border-color: #d1d5db;
+    color: #1c1c1e;
+}
+
+/* Tab bar */
 div[data-testid="stTabs"] > div:first-child button {
-    font-size: 0.9rem;
-    padding: 0.5rem 1rem;
+    font-size: 13px;
+    padding: 0.55rem 1.1rem;
+    font-weight: 600;
+}
+div[data-testid="stTabs"] > div:first-child button[aria-selected="true"] {
+    color: #e8823a;
 }
 
-/* Sidebar section headers */
-.sidebar-stat { font-size: 0.85rem; color: #64748b; margin: 0; }
-.sidebar-val  { font-size: 1rem; font-weight: 600; margin: 0 0 0.5rem; }
+/* Containers (bordered) — act as design's Card */
+div[data-testid="stVerticalBlockBorderWrapper"] {
+    border-radius: 12px !important;
+    border-color: #e5e5e3 !important;
+    background: #ffffff;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+}
+
+/* Sidebar — dark navy per design §2.1 */
+section[data-testid="stSidebar"] {
+    background: #13192b !important;
+    border-right: 1px solid #1e2a42;
+    width: 220px !important;
+    min-width: 220px !important;
+}
+section[data-testid="stSidebar"] > div { padding-top: 8px; }
+section[data-testid="stSidebar"] * { color: #e2e8f0; }
+section[data-testid="stSidebar"] hr,
+section[data-testid="stSidebar"] [data-testid="stHorizontalRule"] { border-color: #1e2a42 !important; background: #1e2a42 !important; }
+
+/* Sidebar buttons — nav items */
+section[data-testid="stSidebar"] .stButton > button {
+    background: transparent;
+    border: none;
+    color: #94a3b8 !important;
+    font-weight: 400;
+    font-size: 13px;
+    text-align: left;
+    justify-content: flex-start;
+    padding: 9px 12px;
+    border-radius: 8px;
+    width: 100%;
+    box-shadow: none;
+}
+section[data-testid="stSidebar"] .stButton > button:hover {
+    background: #1c2540;
+    color: #f1f5f9 !important;
+}
+section[data-testid="stSidebar"] .stButton > button[kind="primary"] {
+    background: #2a3659 !important;
+    color: #ffffff !important;
+    font-weight: 600;
+    border: none;
+}
+
+/* Property switcher block */
+.hmt-prop-switch {
+    margin: 8px 12px 12px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: #1c2540;
+    border: 1px solid #2a3659;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.hmt-prop-switch .icon {
+    width: 32px; height: 32px; border-radius: 8px; background: #e8823a;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    color: white; font-size: 16px; font-weight: 800;
+}
+.hmt-prop-switch .prop-name { font-size: 13px; font-weight: 700; color: #f1f5f9; line-height: 1.2; }
+.hmt-prop-switch .prop-sub  { font-size: 10px; color: #64748b; margin-top: 1px; }
+
+/* Sidebar footer user card */
+.hmt-user {
+    margin: 12px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: transparent;
+    display: flex; align-items: center; gap: 10px;
+    border-top: 1px solid #1e2a42;
+    padding-top: 14px;
+}
+.hmt-user .avatar {
+    width: 28px; height: 28px; border-radius: 50%; background: #2a3659;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700; color: #94a3b8; flex-shrink: 0;
+}
+.hmt-user .name { font-size: 12px; font-weight: 600; color: #e2e8f0; }
+.hmt-user .role { font-size: 10px; color: #475569; }
+
+/* Sidebar-level nav-count badge (for overdue) */
+.hmt-nav-badge {
+    background: #ef4444; color: #fff; font-size: 10px; font-weight: 700;
+    border-radius: 20px; padding: 1px 6px; margin-left: 4px;
+}
+
+/* Category pill — design §2.3 neutral pill variant */
+.hmt-pill {
+    display: inline-block; font-size: 11px; font-weight: 600;
+    letter-spacing: 0.03em; padding: 2px 8px; border-radius: 20px;
+    background: #f4f4f5; color: #52525b; border: 1px solid #e4e4e7;
+}
+
+/* Device dialog specs grid label/value pair */
+.hmt-spec-label {
+    font-size: 11px; color: #9ca3af; text-transform: uppercase;
+    letter-spacing: 0.04em; font-weight: 600;
+}
+.hmt-spec-value {
+    font-size: 14px; color: #1c1c1e; font-weight: 600; margin-top: 2px;
+}
+
+/* Amber notes block — design §3 device detail */
+.hmt-notes {
+    background: #fffbeb; border: 1px solid #fde68a; border-left: 3px solid #f59e0b;
+    border-radius: 8px; padding: 10px 14px; color: #78350f; font-size: 13px;
+    line-height: 1.5; margin: 8px 0 12px;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -100,6 +255,147 @@ def _style_schedule(df: pd.DataFrame):
             return ["background-color: #fefce8"] * len(row)
         return [""] * len(row)
     return df.style.apply(row_bg, axis=1)
+
+
+def _dash_task_group(label: str, schedules: list) -> None:
+    """Dashboard task group — design §3 Needs-Attention / Due-Week / Later-Month."""
+    if not schedules:
+        return
+    st.markdown(
+        f"<h4 style='margin:18px 0 10px;color:#1c1c1e;font-size:14px;"
+        f"text-transform:uppercase;letter-spacing:0.06em;font-weight:700;'>"
+        f"{label}  <span style='color:#9ca3af;font-weight:500'>({len(schedules)})</span></h4>",
+        unsafe_allow_html=True,
+    )
+    for s in schedules:
+        days  = days_until_due(s.next_due_date)
+        sinfo = status_info(days)
+        with st.container(border=True):
+            top1, top2 = st.columns([5, 3])
+            top1.markdown(
+                f"<div style='font-size:11px;color:#9ca3af;text-transform:uppercase;"
+                f"letter-spacing:0.04em;font-weight:600'>{s.device_name}</div>"
+                f"<div style='font-size:15px;font-weight:600;color:#1c1c1e;margin-top:2px'>"
+                f"{s.task_description}</div>",
+                unsafe_allow_html=True,
+            )
+            top2.markdown(
+                f"<div style='text-align:right'>"
+                + badge_html(sinfo["status"], sinfo["label"])
+                + f"<div style='font-size:12px;color:#6b7280;margin-top:4px'>"
+                f"Due {s.next_due_date}</div></div>",
+                unsafe_allow_html=True,
+            )
+
+            log_key = f"dash_log_{s.id}"
+            b1, b2, b3, _pad = st.columns([1, 1, 1, 3])
+            if b1.button("✓ Done", key=f"dash_done_{s.id}", type="primary",
+                         use_container_width=True):
+                st.session_state[log_key] = True
+                st.rerun()
+            if b2.button("⏭ Skip", key=f"dash_skip_{s.id}", use_container_width=True):
+                new_date = sched.advance_schedule(s.id)
+                st.toast(f"Skipped — next due {new_date}", icon="⏭")
+                st.rerun()
+            if b3.button("⏸ Pause", key=f"dash_pause_{s.id}", use_container_width=True):
+                sched.deactivate_schedule(s.id)
+                st.toast("Schedule paused.", icon="⏸")
+                st.rerun()
+
+            if st.session_state.get(log_key):
+                with st.form(f"dash_log_form_{s.id}", clear_on_submit=True, border=True):
+                    st.markdown(f"**Log completion — {s.task_description}**")
+                    la1, la2 = st.columns(2)
+                    ld_date = la1.date_input("Completion date", value=date.today(),
+                                             key=f"dash_log_date_{s.id}")
+                    ld_cost = la2.number_input("Cost (CAD)", min_value=0.0, value=0.0,
+                                               step=0.01, format="%.2f",
+                                               key=f"dash_log_cost_{s.id}")
+                    ld_notes = st.text_area("Notes", height=60, key=f"dash_log_notes_{s.id}")
+                    lb1, lb2 = st.columns(2)
+                    l_sub = lb1.form_submit_button("Save & Advance", type="primary",
+                                                   use_container_width=True)
+                    l_can = lb2.form_submit_button("Cancel", use_container_width=True)
+
+                if l_sub:
+                    hist.add_log(MaintenanceLog(
+                        device_id=s.device_id,
+                        service_type_id=s.service_type_id,
+                        task_performed=s.task_description,
+                        completion_date=str(ld_date),
+                        cost_cad=float(ld_cost),
+                        notes=ld_notes or None,
+                    ))
+                    new_date = sched.advance_schedule(s.id)
+                    st.session_state.pop(log_key, None)
+                    st.toast(f"Logged — next due {new_date}", icon="✅")
+                    st.rerun()
+                if l_can:
+                    st.session_state.pop(log_key, None)
+                    st.rerun()
+
+
+def _device_card(d: Device, device_schedules: list) -> None:
+    """Device grid card — design §3 Devices card."""
+    upcoming = [s for s in device_schedules if s.is_active]
+    next_sched = min(upcoming, key=lambda s: days_until_due(s.next_due_date)) if upcoming else None
+    days_val = days_until_due(next_sched.next_due_date) if next_sched else None
+    sinfo = status_info(days_val)
+    dot_color = STATUS_STYLES[sinfo["status"]]["dot"]
+
+    warranty_expiring = False
+    if d.warranty_expiry:
+        try:
+            wdays = (date.fromisoformat(d.warranty_expiry) - date.today()).days
+            warranty_expiring = 0 <= wdays <= 60
+        except Exception:
+            pass
+
+    with st.container(border=True):
+        st.markdown(
+            f"<div style='height:4px;background:{dot_color};"
+            f"margin:-16px -16px 12px -16px;border-radius:12px 12px 0 0'></div>",
+            unsafe_allow_html=True,
+        )
+        archived_tag = (
+            "<span class='hmt-pill' style='background:#fef2f2;color:#dc2626;"
+            "border-color:#fecaca;margin-left:6px'>Archived</span>"
+            if d.is_archived else ""
+        )
+        st.markdown(
+            f"<div style='font-size:16px;font-weight:700;color:#1c1c1e'>"
+            f"{d.name}{archived_tag}</div>"
+            f"<div style='font-size:13px;color:#6b7280;margin-top:2px'>"
+            f"{d.model or '—'}</div>",
+            unsafe_allow_html=True,
+        )
+
+        pills = [f'<span class="hmt-pill">{d.category}</span>',
+                 badge_html(sinfo["status"], sinfo["label"])]
+        if warranty_expiring:
+            pills.append(badge_html("soon", "Warranty expiring"))
+        st.markdown(
+            "<div style='margin-top:10px;display:flex;flex-wrap:wrap;gap:6px'>"
+            + "".join(pills)
+            + "</div>",
+            unsafe_allow_html=True,
+        )
+
+        spend_total = hist.total_cost(d.id)
+        spend_ytd   = hist.total_cost_this_year(d.id)
+        st.markdown(
+            f"<div style='margin-top:12px;display:flex;gap:18px'>"
+            f"<div><div class='hmt-spec-label'>Spend</div>"
+            f"<div class='hmt-spec-value'>{_money(spend_total)}</div></div>"
+            f"<div><div class='hmt-spec-label'>YTD</div>"
+            f"<div class='hmt-spec-value'>{_money(spend_ytd)}</div></div>"
+            f"</div>",
+            unsafe_allow_html=True,
+        )
+
+        if st.button("Open ↗", key=f"dev_open_{d.id}", use_container_width=True):
+            _device_dialog(d)
+
 
 # ── Log-entry dialog ──────────────────────────────────────────────────────────
 
@@ -215,180 +511,101 @@ def _delete_dialog(label: str, entity: str, entity_id: int):
     if c2.button("Cancel", key="dlg_cancel", use_container_width=True):
         st.rerun()
 
-# ── Sidebar ───────────────────────────────────────────────────────────────────
 
-with st.sidebar:
-    st.markdown("## 🏠 Squamish Home")
-    st.caption(f"📅 {date.today().strftime('%B %d, %Y')}  ·  Squamish, BC")
-    st.divider()
-
-    _all_sched  = sched.list_schedules()
-    _overdue    = [s for s in _all_sched if days_until_due(s.next_due_date) < 0]
-    _due_week   = [s for s in _all_sched if 0 <= days_until_due(s.next_due_date) <= 7]
-    _all_devs   = inv.list_devices()
-
-    if _overdue:
-        st.error(f"⛔ {len(_overdue)} task(s) overdue")
-    elif _due_week:
-        st.warning(f"⚠️ {len(_due_week)} task(s) due this week")
-    else:
-        st.success("✅ All tasks on schedule")
-
-    st.divider()
-    st.markdown('<p class="sidebar-stat">Active devices</p>', unsafe_allow_html=True)
-    st.markdown(f'<p class="sidebar-val">{len(_all_devs)}</p>', unsafe_allow_html=True)
-    st.markdown('<p class="sidebar-stat">Total spend</p>', unsafe_allow_html=True)
-    st.markdown(f'<p class="sidebar-val">{_money(hist.total_cost())}</p>', unsafe_allow_html=True)
-
-    if _overdue:
-        st.divider()
-        st.markdown("**Overdue tasks**")
-        for s in _overdue:
-            d = abs(days_until_due(s.next_due_date))
-            st.markdown(f"• {s.device_name} · {d}d ago")
-
-    if _due_week:
-        st.divider()
-        st.markdown("**Due this week**")
-        for s in _due_week:
-            d = days_until_due(s.next_due_date)
-            label = "today" if d == 0 else f"in {d}d"
-            st.markdown(f"• {s.device_name} · {label}")
-
-    st.divider()
-    logout_button()
-
-# ── Page header ───────────────────────────────────────────────────────────────
-
-st.markdown("# 🏠 Squamish Home")
-st.caption("House Maintenance Tracker")
-st.divider()
-
-# ── Tabs ──────────────────────────────────────────────────────────────────────
-
-tabs = st.tabs(["📊 Dashboard", "📱 Devices", "🔧 Maintenance", "📅 Schedules", "🔔 Notifications"])
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# TAB 0 — DASHBOARD
-# ══════════════════════════════════════════════════════════════════════════════
-
-with tabs[0]:
-    devices     = inv.list_devices()
-    all_sched   = sched.list_schedules()
-    overdue     = [s for s in all_sched if days_until_due(s.next_due_date) < 0]
-    due_week    = [s for s in all_sched if 0 <= days_until_due(s.next_due_date) <= 7]
-    total_spend = hist.total_cost()
-
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Active Devices", len(devices))
-    c2.metric("Overdue", len(overdue),
-              delta=f"action needed" if overdue else None,
-              delta_color="inverse")
-    c3.metric("Due This Week", len(due_week),
-              delta=f"upcoming" if due_week else None,
-              delta_color="off")
-    c4.metric("Spent This Year", _money(hist.total_cost_this_year()))
-
-    st.divider()
-    col_l, col_r = st.columns(2)
-
-    with col_l:
-        st.subheader("Upcoming Tasks")
-        upcoming = sched.get_due_schedules(days_ahead=60) or all_sched[:8]
-        if upcoming:
-            df = pd.DataFrame([
-                {
-                    "Device":   s.device_name,
-                    "Task":     s.task_description,
-                    "Due":      s.next_due_date,
-                    "Status":   _status(days_until_due(s.next_due_date)),
-                }
-                for s in upcoming[:10]
-            ])
-            st.dataframe(_style_schedule(df), hide_index=True, width=680)
-        else:
-            st.info("No upcoming tasks in the next 60 days.")
-
-    with col_r:
-        st.subheader("Recent Activity")
-        logs = hist.list_logs(limit=8)
-        if logs:
-            df = pd.DataFrame([
-                {
-                    "Date":   l.completion_date,
-                    "Device": l.device_name,
-                    "Task":   l.task_performed,
-                    "Cost":   _money(l.cost_cad),
-                }
-                for l in logs
-            ])
-            st.dataframe(df, hide_index=True, width=680)
-        else:
-            st.info("No maintenance history yet. Log your first task in the Maintenance tab.")
-
-    st.divider()
-    st.subheader("🚧 Coming Soon")
-    st.markdown("""
-- **Download schedule** — export upcoming tasks as a printable checklist
-- **Google Calendar sync** — push schedules as recurring calendar events
-- **Photo import** — identify appliance from photo, auto-fill specs
-""")
-
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# TAB 1 — DEVICES
-# ══════════════════════════════════════════════════════════════════════════════
+# ── Device dialog ─────────────────────────────────────────────────────────────
 
 @st.dialog("Device Details", width="large")
 def _device_dialog(device: Device):
-    st.markdown(f"### {device.name}")
-    st.caption(device.category + (" · Archived" if device.is_archived else ""))
-
     recent_logs = hist.list_logs(device_id=device.id, limit=10)
     last_svc = recent_logs[0] if recent_logs else None
+    dev_schedules = [s for s in sched.list_schedules(active_only=False) if s.device_id == device.id]
+    next_sched = min(
+        [s for s in dev_schedules if s.is_active],
+        key=lambda s: days_until_due(s.next_due_date),
+        default=None,
+    )
 
-    dm1, dm2, dm3 = st.columns(3)
-    dm1.metric("Total Spend", _money(hist.total_cost(device.id)))
-    dm2.metric("Warranty Expiry", device.warranty_expiry or "—")
-    if last_svc:
-        dm3.metric("Last Service", last_svc.completion_date)
-        dm3.caption(last_svc.service_type_name or last_svc.task_performed[:30])
-    else:
-        dm3.metric("Last Service", "—")
-    st.divider()
+    head_pill = (
+        f'<span class="hmt-pill">{device.category}</span>'
+        + (' <span class="hmt-pill" style="background:#fef2f2;color:#dc2626;'
+           'border-color:#fecaca;margin-left:6px">Archived</span>' if device.is_archived else "")
+    )
+    st.markdown(
+        f"<div style='font-size:22px;font-weight:800;color:#1c1c1e'>{device.name}</div>"
+        f"<div style='margin-top:4px'>{head_pill}</div>",
+        unsafe_allow_html=True,
+    )
 
-    with st.form("device_detail_form"):
-        fa1, fa2 = st.columns(2)
-        ed_name   = fa1.text_input("Device name *", value=device.name)
-        ed_cat    = fa2.selectbox("Category *", CATEGORIES, index=CATEGORIES.index(device.category))
-        fb1, fb2  = st.columns(2)
-        ed_model  = fb1.text_input("Model", value=device.model or "")
-        ed_serial = fb2.text_input("Serial number", value=device.serial_number or "")
-        fc1, fc2  = st.columns(2)
-        try:    pd_val = date.fromisoformat(device.purchase_date) if device.purchase_date else None
-        except: pd_val = None
-        ed_pdate  = fc1.date_input("Purchase date", value=pd_val)
-        try:    we_val = date.fromisoformat(device.warranty_expiry) if device.warranty_expiry else None
-        except: we_val = None
-        ed_wexp   = fc2.date_input("Warranty expiry", value=we_val)
-        ed_notes  = st.text_area("Notes", value=device.notes or "", height=70)
+    # ── Specs grid (row 1): Model · Serial · Purchased · Warranty ─────────────
+    s1, s2, s3, s4 = st.columns(4)
+    for col, label, value in [
+        (s1, "Model",     device.model or "—"),
+        (s2, "Serial",    device.serial_number or "—"),
+        (s3, "Purchased", device.purchase_date or "—"),
+        (s4, "Warranty",  device.warranty_expiry or "—"),
+    ]:
+        col.markdown(
+            f"<div class='hmt-spec-label'>{label}</div>"
+            f"<div class='hmt-spec-value'>{value}</div>",
+            unsafe_allow_html=True,
+        )
 
-        if st.form_submit_button("Save Changes", type="primary", use_container_width=True):
-            if not ed_name:
-                st.error("Device name is required.")
-            else:
-                device.name            = ed_name
-                device.category        = ed_cat
-                device.model           = ed_model or None
-                device.serial_number   = ed_serial or None
-                device.purchase_date   = str(ed_pdate) if ed_pdate else None
-                device.warranty_expiry = str(ed_wexp) if ed_wexp else None
-                device.notes           = ed_notes or None
-                inv.update_device(device)
-                st.toast("Device updated.", icon="✅")
-                st.rerun()
+    st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+
+    # ── Metrics row: Total · YTD · Next Due · Last Service ────────────────────
+    m1, m2, m3, m4 = st.columns(4)
+    next_due_val = next_sched.next_due_date if next_sched else "—"
+    last_svc_val = last_svc.completion_date if last_svc else "—"
+    for col, label, value in [
+        (m1, "Total Spend",  _money(hist.total_cost(device.id))),
+        (m2, "YTD Spend",    _money(hist.total_cost_this_year(device.id))),
+        (m3, "Next Due",     next_due_val),
+        (m4, "Last Service", last_svc_val),
+    ]:
+        col.markdown(
+            f"<div class='hmt-spec-label'>{label}</div>"
+            f"<div class='hmt-spec-value'>{value}</div>",
+            unsafe_allow_html=True,
+        )
+
+    if device.notes:
+        st.markdown(
+            f"<div class='hmt-notes'><strong>Notes</strong><br>{device.notes}</div>",
+            unsafe_allow_html=True,
+        )
+
+    # ── Edit form (collapsed by default to reduce dialog clutter) ─────────────
+    with st.expander("✎ Edit device", expanded=False):
+        with st.form("device_detail_form"):
+            fa1, fa2 = st.columns(2)
+            ed_name   = fa1.text_input("Device name *", value=device.name)
+            ed_cat    = fa2.selectbox("Category *", CATEGORIES, index=CATEGORIES.index(device.category))
+            fb1, fb2  = st.columns(2)
+            ed_model  = fb1.text_input("Model", value=device.model or "")
+            ed_serial = fb2.text_input("Serial number", value=device.serial_number or "")
+            fc1, fc2  = st.columns(2)
+            try:    pd_val = date.fromisoformat(device.purchase_date) if device.purchase_date else None
+            except: pd_val = None
+            ed_pdate  = fc1.date_input("Purchase date", value=pd_val)
+            try:    we_val = date.fromisoformat(device.warranty_expiry) if device.warranty_expiry else None
+            except: we_val = None
+            ed_wexp   = fc2.date_input("Warranty expiry", value=we_val)
+            ed_notes  = st.text_area("Notes", value=device.notes or "", height=70)
+
+            if st.form_submit_button("Save Changes", type="primary", use_container_width=True):
+                if not ed_name:
+                    st.error("Device name is required.")
+                else:
+                    device.name            = ed_name
+                    device.category        = ed_cat
+                    device.model           = ed_model or None
+                    device.serial_number   = ed_serial or None
+                    device.purchase_date   = str(ed_pdate) if ed_pdate else None
+                    device.warranty_expiry = str(ed_wexp) if ed_wexp else None
+                    device.notes           = ed_notes or None
+                    inv.update_device(device)
+                    st.toast("Device updated.", icon="✅")
+                    st.rerun()
 
     # ── Service Types ──────────────────────────────────────────────────────────
     st.divider()
@@ -499,7 +716,8 @@ def _device_dialog(device: Device):
             st.caption("No maintenance history yet.")
 
     st.divider()
-    ga1, ga2, ga3 = st.columns([1, 1, 3])
+    confirm_key = f"dev_confirm_del_{device.id}"
+    ga1, ga2, _ = st.columns([1, 1, 3])
     with ga1:
         arch_label = "Restore" if device.is_archived else "Archive"
         if st.button(arch_label, key=f"dlg_arch_{device.id}", use_container_width=True):
@@ -508,10 +726,152 @@ def _device_dialog(device: Device):
             st.rerun()
     with ga2:
         if st.button("Delete", key=f"dlg_del_{device.id}", type="secondary", use_container_width=True):
-            _delete_dialog(device.name, "device", device.id)
+            st.session_state[confirm_key] = True
+            st.rerun()
+
+    if st.session_state.get(confirm_key):
+        with st.container(border=True):
+            st.markdown(
+                f"<div style='color:#991b1b;font-weight:600'>Delete {device.name}?</div>"
+                f"<div style='color:#7f1d1d;font-size:13px;margin-top:2px'>"
+                f"All linked maintenance history and schedules will also be deleted.</div>",
+                unsafe_allow_html=True,
+            )
+            cc1, cc2, _ = st.columns([1, 1, 3])
+            if cc1.button("Confirm Delete", key=f"dev_del_confirm_{device.id}",
+                          type="primary", use_container_width=True):
+                inv.delete_device(device.id)
+                st.session_state.pop(confirm_key, None)
+                st.rerun()
+            if cc2.button("Cancel", key=f"dev_del_cancel_{device.id}",
+                          use_container_width=True):
+                st.session_state.pop(confirm_key, None)
+                st.rerun()
 
 
-with tabs[1]:
+# ── Sidebar nav (design §2.1) ─────────────────────────────────────────────────
+
+NAV_ITEMS = [
+    ("dashboard",    "⌂ Dashboard"),
+    ("devices",      "⊞ Devices"),
+    ("history",      "⚙ History"),
+    ("schedules",    "◷ Schedules"),
+    ("integrations", "◉ Integrations"),
+    ("roadmap",      "◈ Roadmap"),
+]
+
+if "nav" not in st.session_state:
+    st.session_state.nav = "dashboard"
+
+_all_sched_sidebar = sched.list_schedules()
+_overdue_count = sum(1 for s in _all_sched_sidebar if days_until_due(s.next_due_date) < 0)
+
+with st.sidebar:
+    st.markdown(
+        '<div class="hmt-prop-switch">'
+        '<div class="icon">🏠</div>'
+        '<div><div class="prop-name">Squamish Home</div>'
+        '<div class="prop-sub">Squamish, BC</div></div>'
+        '</div>',
+        unsafe_allow_html=True,
+    )
+
+    for view_id, label in NAV_ITEMS:
+        is_active = st.session_state.nav == view_id
+        suffix = f"  ({_overdue_count})" if view_id == "dashboard" and _overdue_count else ""
+        if st.button(
+            label + suffix,
+            key=f"nav_{view_id}",
+            type="primary" if is_active else "secondary",
+            use_container_width=True,
+        ):
+            st.session_state.nav = view_id
+            st.rerun()
+
+    st.markdown("<div style='flex:1'></div>", unsafe_allow_html=True)
+    st.markdown(
+        '<div class="hmt-user">'
+        '<div class="avatar">S</div>'
+        '<div><div class="name">Sergey P.</div>'
+        '<div class="role">Owner</div></div>'
+        '</div>',
+        unsafe_allow_html=True,
+    )
+    logout_button()
+
+nav = st.session_state.nav
+
+# ══════════════════════════════════════════════════════════════════════════════
+# VIEW — DASHBOARD
+# ══════════════════════════════════════════════════════════════════════════════
+
+if nav == "dashboard":
+    devices   = inv.list_devices()
+    active    = sched.list_schedules()  # active_only=True by default
+    overdue   = sorted([s for s in active if days_until_due(s.next_due_date) < 0],
+                       key=lambda s: days_until_due(s.next_due_date))
+    due_today = [s for s in active if days_until_due(s.next_due_date) == 0]
+    due_week  = sorted([s for s in active if 1 <= days_until_due(s.next_due_date) <= 7],
+                       key=lambda s: days_until_due(s.next_due_date))
+    due_month = sorted([s for s in active if 7 < days_until_due(s.next_due_date) <= 30],
+                       key=lambda s: days_until_due(s.next_due_date))
+    this_week_count = len(overdue) + len(due_today) + len(due_week)
+
+    # ── Stat row (design §3, tinted for urgency) ──────────────────────────────
+    c1, c2, c3, c4 = st.columns(4)
+    c1.markdown(stat_card_html("Active Devices", str(len(devices))),
+                unsafe_allow_html=True)
+    c2.markdown(stat_card_html("Overdue", str(len(overdue)),
+                               tone="danger" if overdue else "neutral"),
+                unsafe_allow_html=True)
+    c3.markdown(stat_card_html("Due This Week", str(len(due_today) + len(due_week)),
+                               tone="warn" if (due_today or due_week) else "neutral"),
+                unsafe_allow_html=True)
+    c4.markdown(stat_card_html("Spent This Year", _money(hist.total_cost_this_year())),
+                unsafe_allow_html=True)
+
+    st.markdown("<div style='height:22px'></div>", unsafe_allow_html=True)
+
+    col_l, col_r = st.columns([3, 2])
+
+    with col_l:
+        if not (overdue or due_today or due_week or due_month):
+            st.info("No tasks due in the next 30 days. 🎉")
+        else:
+            _dash_task_group("Needs Attention", overdue + due_today)
+            _dash_task_group("Due This Week",   due_week)
+            _dash_task_group("Later This Month", due_month)
+
+    with col_r:
+        st.markdown(
+            "<h4 style='margin:0 0 12px;font-size:14px;text-transform:uppercase;"
+            "letter-spacing:0.06em;font-weight:700;color:#1c1c1e'>Recent Activity</h4>",
+            unsafe_allow_html=True,
+        )
+        logs = hist.list_logs(limit=5)
+        if not logs:
+            st.caption("No maintenance history yet.")
+        else:
+            for l in logs:
+                with st.container(border=True):
+                    st.markdown(
+                        f"<div style='font-size:11px;color:#9ca3af;font-weight:600;"
+                        f"text-transform:uppercase;letter-spacing:0.04em'>{l.completion_date}</div>"
+                        f"<div style='font-size:14px;font-weight:600;color:#1c1c1e;"
+                        f"margin:2px 0 1px'>{l.device_name}</div>"
+                        f"<div style='font-size:13px;color:#4b5563'>{l.task_performed}</div>"
+                        f"<div style='font-size:13px;color:#e8823a;font-weight:700;"
+                        f"margin-top:4px'>{_money(l.cost_cad) if l.cost_cad else '—'}</div>",
+                        unsafe_allow_html=True,
+                    )
+
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# VIEW — DEVICES
+# ══════════════════════════════════════════════════════════════════════════════
+
+elif nav == "devices":
     ih1, ih2 = st.columns([5, 1])
     ih1.subheader("Devices")
     if ih2.button("＋ Add Device", type="primary", use_container_width=True, key="inv_add_toggle"):
@@ -572,32 +932,30 @@ with tabs[1]:
     )
 
     if devs:
-        hcols = st.columns([3, 2, 1, 1])
-        for col, label in zip(hcols, ["Name", "Category", "Spend", ""]):
-            col.markdown(f"<span style='font-size:0.75rem;text-transform:uppercase;color:#64748b;font-weight:600;letter-spacing:0.05em'>{label}</span>", unsafe_allow_html=True)
-        st.markdown("<hr style='margin:4px 0 8px'>", unsafe_allow_html=True)
-        for d in devs:
-            with st.container():
-                rc = st.columns([3, 2, 1, 1])
-                name_text = f"{'🗄 ' if d.is_archived else ''}{d.name}"
-                rc[0].markdown(f"**{name_text}**")
-                rc[1].markdown(f"<span style='font-size:0.85rem;color:#475569'>{d.category}</span>", unsafe_allow_html=True)
-                rc[2].markdown(f"<span style='font-size:0.85rem'>{_money(hist.total_cost(d.id))}</span>", unsafe_allow_html=True)
-                if rc[3].button("Open ↗", key=f"dev_open_{d.id}", use_container_width=True):
-                    _device_dialog(d)
-            st.markdown("<hr style='margin:2px 0;border-color:#f1f5f9'>", unsafe_allow_html=True)
+        # Pre-fetch all schedules once so each card can filter locally (avoids N queries)
+        all_schedules = sched.list_schedules(active_only=False)
+        sched_by_dev: dict = {}
+        for s in all_schedules:
+            sched_by_dev.setdefault(s.device_id, []).append(s)
+
+        COLS = 3
+        for i in range(0, len(devs), COLS):
+            row = st.columns(COLS)
+            for col, d in zip(row, devs[i:i + COLS]):
+                with col:
+                    _device_card(d, sched_by_dev.get(d.id, []))
     else:
         st.info("No devices found. Add your first device above.")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# TAB 2 — MAINTENANCE
+# VIEW — HISTORY
 # ══════════════════════════════════════════════════════════════════════════════
 
-with tabs[2]:
+elif nav == "history":
     hh1, hh2 = st.columns([5, 1])
-    hh1.subheader("Maintenance")
-    if hh2.button("＋ Log Expense", type="primary", use_container_width=True, key="hist_add_toggle"):
+    hh1.subheader("Maintenance History")
+    if hh2.button("＋ Log Entry", type="primary", use_container_width=True, key="hist_add_toggle"):
         st.session_state.show_hist_add = not st.session_state.get("show_hist_add", False)
         st.session_state.pop("prefill_log", None)
 
@@ -763,10 +1121,10 @@ with tabs[2]:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# TAB 3 — SCHEDULES
+# VIEW — SCHEDULES
 # ══════════════════════════════════════════════════════════════════════════════
 
-with tabs[3]:
+elif nav == "schedules":
     sh1, sh2 = st.columns([5, 1])
     sh1.subheader("Maintenance Schedules")
     if sh2.button("＋ Add Manual", type="secondary", use_container_width=True, key="sched_add_toggle"):
@@ -858,11 +1216,11 @@ with tabs[3]:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# TAB 4 — NOTIFICATIONS
+# VIEW — INTEGRATIONS
 # ══════════════════════════════════════════════════════════════════════════════
 
-with tabs[4]:
-    st.subheader("Notifications")
+elif nav == "integrations":
+    st.subheader("Integrations")
 
     # ── Google Calendar ───────────────────────────────────────────────────────
     cal_col, _ = st.columns(2)
@@ -889,11 +1247,21 @@ with tabs[4]:
                         dev = inv.get_device(s.device_id)
                         if not dev:
                             continue
+                        # Part numbers + tutorial/purchase links live on the service type now,
+                        # not the device. Pull them from the schedule's service type if any.
+                        stype = svcs.get_service_type(s.service_type_id) if s.service_type_id else None
+                        resource_links = {}
+                        if stype:
+                            if stype.tutorial_url:
+                                resource_links["tutorial"] = stype.tutorial_url
+                            if stype.purchase_url:
+                                resource_links["purchase"] = stype.purchase_url
                         try:
                             eid = create_calendar_event(
                                 device_name=dev.name, task_description=s.task_description,
                                 due_date=s.next_due_date, frequency_days=s.frequency_days,
-                                part_numbers=dev.part_numbers, resource_links=dev.resource_links,
+                                part_numbers=stype.part_numbers if stype else [],
+                                resource_links=resource_links,
                                 notes=dev.notes,
                             )
                             sched.set_calendar_event_id(s.id, eid)
@@ -908,3 +1276,52 @@ with tabs[4]:
                 st.rerun()
 
     # TODO: download schedule as a checklist (PDF or CSV export of upcoming tasks)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# VIEW — ROADMAP
+# ══════════════════════════════════════════════════════════════════════════════
+
+elif nav == "roadmap":
+    st.subheader("Roadmap")
+    st.caption("Where the Tracker is heading. Source of truth: `design_handoff/DESIGN.md §7`.")
+
+    _phases = [
+        ("Phase 1 — Now",    "#15803d", "#f0fdf4", [
+            ("Device inventory with service types",     True),
+            ("Maintenance history log",                 True),
+            ("Schedule management",                     True),
+            ("Google Calendar sync",                    True),
+        ]),
+        ("Phase 2 — Next",   "#2563eb", "#eff6ff", [
+            ("AI-powered parts finder",                 False),
+            ("AI-powered tutorial finder",              False),
+            ("Dashboard AI chat assistant",             False),
+            ("Photo upload → AI device identification", False),
+            ("Amazon.ca parts linking (with referral)", False),
+            ("Spend analytics & cost projections",      False),
+            ("Download schedule as CSV/PDF",            False),
+        ]),
+        ("Phase 3 — Future", "#7c3aed", "#f5f3ff", [
+            ("Multi-unit / building manager mode",      False),
+            ("Shared maintenance templates per unit",   False),
+            ("Individual unit owner accounts",          False),
+            ("Service provider booking",                False),
+        ]),
+    ]
+
+    for label, color, bg, features in _phases:
+        with st.container(border=True):
+            st.markdown(
+                f'<span style="font-size:11px;font-weight:700;padding:3px 10px;'
+                f'border-radius:20px;background:{bg};color:{color};">{label}</span>',
+                unsafe_allow_html=True,
+            )
+            for name, done in features:
+                icon = "✅" if done else "◯"
+                color_txt = "#1c1c1e" if done else "#6b7280"
+                st.markdown(
+                    f'<div style="font-size:13px;color:{color_txt};padding:4px 0;">'
+                    f'{icon} {name}</div>',
+                    unsafe_allow_html=True,
+                )

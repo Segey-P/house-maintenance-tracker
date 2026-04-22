@@ -12,73 +12,101 @@ Streamlit (`app.py`). Run with: `streamlit run app.py`
 
 | Env | URL pattern | Auth |
 |---|---|---|
-| Local dev | `http://localhost:8501` | None |
-| Streamlit Community Cloud (primary) | `https://<app>.streamlit.app` | bcrypt password via `st.secrets` (same pattern as Project Hub) |
+| Local dev | `http://localhost:8501` | bcrypt password via `st.secrets` (same pattern as Streamlit Cloud) |
+| Streamlit Community Cloud (primary) | `https://house-maintenance-tracker.streamlit.app` | bcrypt password via `st.secrets` |
 
-Data storage for the cloud deployment must be compatible with an ephemeral filesystem: use a persisted backend (SQLite in a GitHub-committed file, or a free-tier hosted database like Turso/Supabase) rather than relying on local disk writes.
+Data lives in a Neon PostgreSQL database (see Module 3). The Streamlit Cloud filesystem is ephemeral, so no local-disk storage is used.
 
-## 3. Tab Structure
+## 3. Navigation
 
-### 3.1 Dashboard
+The UI uses a **dark-navy left sidebar** (per `design_handoff/DESIGN.md §2.1`), not top tabs. View state is held in `st.session_state.nav` and defaults to `dashboard`.
+
+**Sidebar layout (top → bottom):**
+1. Property switcher placeholder — static "Squamish Home · Squamish, BC" card
+2. Nav list: Dashboard · Devices · History · Schedules · Integrations · Roadmap
+3. User card + Sign out button (pinned to the footer)
+
+The Dashboard nav item shows an inline red overdue-count badge when one or more schedules are past due.
+
+Shared UI primitives live in `src/ui.py`:
+
+| Helper | Use |
+|---|---|
+| `status_info(days)` | Returns `{label, status}` for a day delta (overdue / today / soon / upcoming / ok / neutral) |
+| `badge_html(status, label)` | Inline pill HTML using the design's status colour system |
+| `stat_card_html(label, value, tone)` | Tinted dashboard stat card (tones: `neutral` / `danger` / `warn`) |
+
+## 4. Views
+
+### 4.1 Dashboard
 
 Read-only overview. Refreshes on every load.
 
 | Element | Detail |
 | :--- | :--- |
-| Metric cards | Active devices, Overdue count, Due This Week, Total Spend (CAD) |
+| Metric cards | Active devices, Overdue count, Due This Week, Spent This Year (CAD) |
 | Upcoming Tasks | Next 10 schedules within 60 days, status badge colour-coded |
 | Recent Activity | Last 8 maintenance log entries |
 
-### 3.2 Inventory
+Wave 2 will replace the metric row with tinted stat cards (danger/warn tones) and the tables with grouped task cards + inline ✓ Done / ⏭ Skip actions.
 
-Full CRUD for devices.
+### 4.2 Devices
 
-| Action | Mechanism |
-| :--- | :--- |
-| View | Filterable table (by category, archived flag) |
-| Add | Expandable form — all device fields |
-| Edit | Selectbox → pre-populated form → Save Changes |
-| Archive | Toggle button — hides device but preserves history |
-| Delete | Two-click confirmation → hard delete with cascade |
-| Photo Upload | Disabled placeholder; reserved for Phase 2 AI identification |
-
-### 3.3 History / Expenses
-
-Full CRUD for maintenance log entries.
+Full CRUD for devices. Opening any device launches the `_device_dialog` modal.
 
 | Action | Mechanism |
 | :--- | :--- |
-| View | Filterable by device; configurable row limit; running total shown |
-| Add | Expandable form — device, date, task, cost, sourcing, notes |
-| Edit | Selectbox → pre-populated form → Save Changes |
-| Delete | Two-click confirmation |
+| View | Row list, filterable by category; "Show archived" checkbox |
+| Add | "＋ Add Device" button → expandable form; on save the device dialog auto-opens so service types can be added immediately |
+| Edit | Per-row "Open ↗" → modal with form → Save Changes |
+| Service types | Managed inside the device dialog — add / edit / delete, each with name, interval, part numbers, tutorial URL, purchase URL, notes |
+| Archive / Restore | Toggle button inside the device dialog — hides device but preserves history |
+| Delete | Two-click confirmation via `_delete_dialog` → hard delete with cascade |
+| Photo Upload | Reserved for Phase 2 AI identification (not yet implemented) |
 
-### 3.4 Schedules
+### 4.3 History
 
-Full management of maintenance schedules.
+Full CRUD for maintenance log entries. Entries may optionally link to a service type on the selected device.
 
 | Action | Mechanism |
 | :--- | :--- |
-| View | Table with status badge, frequency, calendar link indicator |
-| Add | Expandable form — device, task, first due date, frequency |
-| Edit | Selectbox → pre-populated form → Save Changes |
-| Activate / Deactivate | Toggle button |
-| Delete | Two-click confirmation |
+| View | Grouped by device in expanders; filterable by device; configurable row limit (10/25/50/100); running total shown |
+| Add | "＋ Log Entry" button → expandable form — device, service type, date, task, cost, sourcing, notes |
+| Complete Due Task | "Due & Overdue Tasks" banner with inline ✅ Log / ⏭ Skip / ⏸ Pause actions per schedule |
+| Edit | Per-entry "Open ↗" → modal with form → Save Changes |
+| Delete | From inside the entry modal → two-click confirmation |
 
-### 3.5 Notifications
+### 4.4 Schedules
 
-Triggers for Google Calendar and Gmail integrations.
+Full management of maintenance schedules. Schedules are normally created automatically when a service type is added to a device.
+
+| Action | Mechanism |
+| :--- | :--- |
+| View | Grouped by device in expanders with overdue/due-soon/on-track badges |
+| Add | "＋ Add Manual" button (manual schedule without a service type) |
+| Edit | Per-row "Open ↗" → modal with form → Save Changes |
+| Pause / Resume | Toggled from the per-row modal; paused schedules skipped by calendar push |
+| Delete | From inside the schedule modal → two-click confirmation |
+
+### 4.5 Integrations
+
+Triggers for the Google Calendar integration. Previously named "Notifications". Email alerts were removed from scope.
 
 | Element | Detail |
 | :--- | :--- |
 | Calendar Push | Device filter (all or specific), force re-push toggle, Push button |
-| Calendar Status | Live count of linked vs. unlinked schedules |
-| Email Alerts | Day window slider (1–30), live preview of affected tasks, Send button |
+| Calendar Status | Live count of linked vs. not-yet-pushed schedules |
+| Event payload | Device name, task, due date, frequency, part numbers + tutorial + purchase URLs pulled from the schedule's service type |
 
-## 4. UX Conventions
+### 4.6 Roadmap
 
-- Two-click confirmation for all destructive actions (delete).
-- Forms use `st.form` with `clear_on_submit=True` to reset after save.
-- `st.rerun()` called after all mutations to reflect updated state immediately.
-- Notification imports are lazy (inside button handlers) to avoid startup errors if Google token is missing.
-- Status badges: ⛔ overdue · 🔴 due today · 🟡 within 7d · 🟢 future.
+Read-only view showing Phase 1 (Now) / Phase 2 (Next) / Phase 3 (Future) feature checklists. Replaces the "Coming Soon" block that previously lived on the Dashboard. Source of truth: `design_handoff/DESIGN.md §7`.
+
+## 5. UX Conventions
+
+- Destructive actions use the `_delete_dialog` modal → two-click confirmation.
+- All detail views (log entry / schedule / device) open in `@st.dialog` modals. The design's right-edge slide-over panels are approximated by centred modals under Option A.
+- Forms use `st.form` with `clear_on_submit=True` where appropriate so they reset after save.
+- `st.rerun()` is called after mutations to reflect updated state immediately.
+- Integration imports are lazy (inside button handlers) to avoid startup errors if Google credentials are missing.
+- Status badges: `src/ui.py::badge_html` renders the design §2.3 colour system (overdue / today / soon / upcoming / ok / neutral). Legacy emoji fallback (`⛔ 🔴 🟡 🟢`) still used inside dataframes where inline HTML is not supported.

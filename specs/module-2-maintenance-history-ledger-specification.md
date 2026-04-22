@@ -10,6 +10,7 @@ Maintain a complete historical record of all maintenance activities for budgetin
 | :--- | :--- |
 | Completion Date | Date the maintenance was performed |
 | Device Reference | FK to the inventory item |
+| Service Type Reference | FK to service type; NULL if the entry is manual / ad-hoc |
 | Task Performed | Description of the work (e.g., "Replaced HVAC Filter") |
 | Cost (CAD) | Expenditure on parts, tools, or professional service |
 | Sourcing Info | Vendor or URL where replacement parts were found |
@@ -17,12 +18,15 @@ Maintain a complete historical record of all maintenance activities for budgetin
 
 ## 3. UI Operations
 
+All log actions live in the **History** view (sidebar nav).
+
 | Action | Mechanism |
 | :--- | :--- |
-| View | Filterable by device; configurable row limit (10/25/50/100); running spend total shown inline |
-| Add | "+ Log Expense" button top-right → inline form above table |
-| Edit | "Edit / Delete Entry" expander → selectbox → pre-populated form |
-| Delete | Modal confirmation dialog |
+| View | Device-grouped expanders; filterable by device; configurable row limit (10/25/50/100); running spend total shown inline |
+| Add | "＋ Log Entry" button top-right → inline form above the list |
+| Complete Due Task | "Due & Overdue Tasks" banner → ✅ Log prefills the form and advances the schedule on save |
+| Edit | Per-entry "Open ↗" → `@st.dialog` modal with pre-populated form → Save Changes |
+| Delete | From inside the entry modal → two-click confirmation |
 
 ## 4. CLI Operations
 
@@ -33,13 +37,13 @@ python main.py history add   # interactive prompts
 
 ## 5. Workflow
 
-1. Task completed → user clicks "+ Log Expense" in History tab (or `history add` via CLI)
-2. Logs date, cost, sourcing, notes linked to device
-3. After logging, optionally advance the associated schedule's next due date
+1. Task completed → user clicks "＋ Log Entry" in the History view (or `history add` via CLI)
+2. Logs date, cost, sourcing, notes linked to device (and optionally a service type)
+3. If the entry was launched from the Due & Overdue Tasks banner, the associated schedule's next due date advances automatically on save
 4. Entry appended to history; spend totals update in real time
 
 ## 6. Spend Tracking
 
-- Per-device total available on device detail view (Inventory tab)
-- Global total shown in History tab filter bar and Dashboard metric card
+- Per-device total shown inside the device dialog (Devices view)
+- Global and per-device totals shown in the History view filter bar and on the Dashboard stat row
 - Future: cost analytics dashboard with trend charts (Phase 2)

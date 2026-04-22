@@ -1,36 +1,40 @@
-# Module 3: Scheduling and Notification Engine
+# Module 3: Scheduling and Integrations Engine
 
 ## 1. Objective
 
-Automate maintenance interval tracking and deliver timely reminders via Google Calendar and Gmail. Schedules are fully manageable through both the Web UI and CLI.
+Automate maintenance interval tracking and deliver calendar-based reminders via Google Calendar. Schedules are fully manageable through both the Web UI and CLI.
 
-## 2. Notification Channels
+## 2. Integrations
 
 | Channel | Detail |
 | :--- | :--- |
 | Google Calendar | Recurring all-day events pushed to primary calendar. RFC 5545 RRULE set by frequency. |
-| Gmail | HTML email to `sergey.pochikovskiy@gmail.com` with device details, urgency badge, parts list, purchase link, tutorial link. |
 
-## 3. Notification Content
+Email alerts were part of earlier scope and have since been removed. Proactive notifications are likely to return as per-task reminders attached to calendar events, or as a separate AI-driven channel — see `TODO.md` backlog.
 
-Each alert includes:
+## 3. Calendar Event Payload
+
+Each event includes:
 
 - Device name and category
-- Task description
-- Due date with urgency label (Overdue / Due today / In Nd)
-- Required part numbers
-- Purchase link (Amazon.ca or specified vendor)
-- YouTube tutorial link
+- Task description (from the schedule)
+- Due date with frequency as an RRULE
+- Required part numbers (from the linked service type)
+- Purchase link (from the linked service type — typically Amazon.ca)
+- YouTube tutorial link (from the linked service type)
+
+If a schedule has no linked service type, the part numbers and resource links are simply omitted from the event description.
 
 ## 4. Schedule Data Structure
 
 | Field | Description |
 | :--- | :--- |
 | Device Reference | FK to inventory item |
+| Service Type Reference | FK to service type; NULL for manual schedules |
 | Task Description | What needs to be done |
 | Next Due Date | ISO date of next occurrence |
 | Frequency (days) | Repeat interval — displayed as readable alias where applicable |
-| Is Active | Paused schedules are hidden from default view and skipped in alerts |
+| Is Active | Paused schedules are hidden from default view and skipped in calendar pushes |
 | Calendar Event ID | Google Calendar event ID once pushed; NULL if not yet linked |
 
 ## 5. Frequency Aliases
@@ -38,22 +42,27 @@ Each alert includes:
 | Days | Label |
 | :--- | :--- |
 | 7 | Weekly |
+| 14 | Bi-weekly |
 | 30 | Monthly |
+| 60 | Every 2 months |
 | 90 | Quarterly |
+| 120 | Every 4 months |
 | 180 | Semi-annual |
 | 365 | Annual |
 
 ## 6. UI Operations
 
+Schedules are typically **auto-created** when a service type is added to a device. Manual schedules are supported for ad-hoc tasks.
+
 | Action | Mechanism |
 | :--- | :--- |
-| View | Full schedule table with status badges and calendar link status |
-| Add | "+ Add Schedule" button top-right → inline form |
-| Edit | "Edit / Manage Schedule" expander → selectbox → pre-populated form |
-| Pause / Resume | Toggle button — paused schedules excluded from alerts |
-| Delete | Modal confirmation dialog |
-| Push Calendar | Notifications tab → Push to Calendar (per device or all; force re-push option) |
-| Email Alerts | Notifications tab → slider for day window → live preview → Send |
+| View | Device-grouped list with status badges and per-device overdue / due-soon summaries |
+| Add | Schedules view → "＋ Add Manual" → inline form (device, task, first due date, frequency) |
+| Edit | Per-row "Open ↗" → `@st.dialog` modal → Save Changes |
+| Pause / Resume | Toggled from the schedule modal — paused schedules excluded from calendar pushes |
+| Delete | From inside the schedule modal → two-click confirmation |
+| Push Calendar | Integrations view → Push to Calendar (per device or all; force re-push option) |
+| Complete Due Task | History view → Due & Overdue Tasks banner → inline ✅ Log / ⏭ Skip / ⏸ Pause |
 
 ## 7. CLI Operations
 
@@ -61,16 +70,17 @@ Each alert includes:
 python main.py schedule list [--all]
 python main.py schedule due [--days N]
 python main.py notify push [--device ID] [--force]
-python main.py notify check [--days N]
 ```
 
 ## 8. Interval Logic
 
 - **Static:** Based on manufacturer recommendation (e.g., every 90 days for furnace filter)
-- **Advance on completion:** After logging a history entry, user is prompted to advance the schedule's next due date by the frequency interval
+- **Advance on completion:** After logging a history entry against a schedule, the schedule's next due date advances by `frequency_days`
 - **Seasonal tasks:** Currently handled as static intervals; seasonal automation is a future enhancement
 
 ## 9. Auth
 
-OAuth 2.0 via `setup_auth.py`. Token stored at `config/credentials/token.json` (gitignored).  
-Required Google APIs: **Google Calendar API v3**, **Gmail API v1** — must be enabled in the same Cloud project as the OAuth client.
+OAuth 2.0 via `setup_auth.py`. Token stored at `config/credentials/token.json` (gitignored).
+Required Google APIs: **Google Calendar API v3** — must be enabled in the same Cloud project as the OAuth client.
+
+Cloud deployment note: the current OAuth token is a local-dev-only artefact. Running calendar push on Streamlit Community Cloud requires the token to be surfaced via `st.secrets`; see `TODO.md` backlog.
