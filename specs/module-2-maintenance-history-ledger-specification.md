@@ -22,9 +22,9 @@ All log actions live in the **History** view (sidebar nav).
 
 | Action | Mechanism |
 | :--- | :--- |
-| View | Device-grouped expanders; filterable by device; configurable row limit (10/25/50/100); running spend total shown inline |
+| View | Flat bordered-card list (date · device · task · cost · service-type), sorted by completion date. Filter bar: Device · Category · Date From · Date To · Limit (10/25/50/100). Filtered Entries + Spend totals pinned top-right |
 | Add | "＋ Log Entry" button top-right → inline form above the list |
-| Complete Due Task | "Due & Overdue Tasks" banner → ✅ Log prefills the form and advances the schedule on save |
+| Complete Due Task | Compact amber chip row (3-wide) above the list; clicking a chip prefills the log form and advances the schedule on save |
 | Edit | Per-entry "Open ↗" → `@st.dialog` modal with pre-populated form → Save Changes |
 | Delete | From inside the entry modal → two-click confirmation |
 

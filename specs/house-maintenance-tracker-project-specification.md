@@ -79,10 +79,10 @@ Streamlit-based single-page application deployed to Streamlit Community Cloud at
 
 Navigation is a dark-navy left sidebar (no top tabs). Views:
 
-* **Dashboard:** Key metrics (active devices, overdue count, due this week, YTD spend), upcoming tasks table, recent activity feed.
-* **Devices:** Filterable device list; Add / Edit / Archive / Delete via `_device_dialog`; service types managed inside the dialog; photo upload placeholder (Phase 2).
-* **History:** Device-grouped expense log; Add / Edit / Delete entries; running spend total; Due & Overdue Tasks banner with inline Log / Skip / Pause actions.
-* **Schedules:** Device-grouped schedule list with status badges; Add manual / Edit / Pause / Delete; calendar link status.
+* **Dashboard:** Tinted stat row (Active / Overdue-danger / Due-This-Week-warn / YTD spend); task groups (Needs Attention / Due This Week / Later This Month) with inline ✓ Done / ⏭ Skip / ⏸ Pause and an expanding quick-log form; Recent Activity card list.
+* **Devices:** 3-column card grid with status-coloured accent strips and pills; Add / Edit / Archive / Delete via `_device_dialog` (inline delete confirmation); service types managed inside the dialog; photo upload reserved for Phase 2.
+* **History:** Flat card list with Device / Category / Date-range / Limit filter bar and running spend total; Due & Overdue Tasks chip banner; Add / Edit / Delete entries.
+* **Schedules:** Urgency-grouped cards (Overdue / This Week / This Month / Later / Paused) with inline Pause/Resume and `🗓 Synced` pills; Add manual / Edit / Delete; ⬇ CSV export.
 * **Integrations:** Google Calendar push (per device or all, with force re-push option). Email alerts removed.
 * **Roadmap:** Phase 1 / 2 / 3 checklist mirroring `design_handoff/DESIGN.md §7`.
 
