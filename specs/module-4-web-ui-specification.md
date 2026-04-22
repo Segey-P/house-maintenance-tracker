@@ -44,11 +44,9 @@ Read-only overview. Refreshes on every load.
 
 | Element | Detail |
 | :--- | :--- |
-| Metric cards | Active devices, Overdue count, Due This Week, Spent This Year (CAD) |
-| Upcoming Tasks | Next 10 schedules within 60 days, status badge colour-coded |
-| Recent Activity | Last 8 maintenance log entries |
-
-Wave 2 will replace the metric row with tinted stat cards (danger/warn tones) and the tables with grouped task cards + inline ✓ Done / ⏭ Skip actions.
+| Stat row | Active devices · Overdue (danger tint) · Due This Week (warn tint) · Spent This Year (CAD) |
+| Task groups | Needs Attention (overdue + today) · Due This Week (1–7d) · Later This Month (8–30d) — each card has inline ✓ Done / ⏭ Skip / ⏸ Pause; ✓ Done expands a quick-log form that writes the log and advances the schedule atomically |
+| Recent Activity | Last 5 log entries as bordered cards (date, device, task, cost) |
 
 ### 4.2 Devices
 
@@ -56,13 +54,14 @@ Full CRUD for devices. Opening any device launches the `_device_dialog` modal.
 
 | Action | Mechanism |
 | :--- | :--- |
-| View | Row list, filterable by category; "Show archived" checkbox |
+| View | 3-column card grid. Each card: status-coloured accent strip, name + model, category/status/warranty pills, Total + YTD spend, Open ↗ |
+| Filter | Category filter + "Show archived" checkbox |
 | Add | "＋ Add Device" button → expandable form; on save the device dialog auto-opens so service types can be added immediately |
-| Edit | Per-row "Open ↗" → modal with form → Save Changes |
+| Edit | Per-card "Open ↗" → modal with 4-col specs grid + 4-col metrics grid + amber notes block; edit form in a collapsed expander |
 | Service types | Managed inside the device dialog — add / edit / delete, each with name, interval, part numbers, tutorial URL, purchase URL, notes |
 | Archive / Restore | Toggle button inside the device dialog — hides device but preserves history |
-| Delete | Two-click confirmation via `_delete_dialog` → hard delete with cascade |
-| Photo Upload | Reserved for Phase 2 AI identification (not yet implemented) |
+| Delete | Inline two-click confirmation inside the device dialog (replaces `_delete_dialog` for devices); `_delete_dialog` retained for logs + schedules |
+| Photo Upload | Reserved for Phase 2 AI identification (not yet implemented — needs ephemeral-safe storage) |
 
 ### 4.3 History
 
@@ -70,9 +69,10 @@ Full CRUD for maintenance log entries. Entries may optionally link to a service 
 
 | Action | Mechanism |
 | :--- | :--- |
-| View | Grouped by device in expanders; filterable by device; configurable row limit (10/25/50/100); running total shown |
+| View | Flat bordered-card list (date · device · task · cost · service-type), sorted by completion date |
+| Filter bar | Device · Category · Date From · Date To · Limit (10/25/50/100). Category resolved through device lookup. Filtered Entries + Spend totals pinned to the right |
+| Due Tasks banner | Compact amber chip row (3-wide) above the list; clicking a chip prefills the log form and opens it |
 | Add | "＋ Log Entry" button → expandable form — device, service type, date, task, cost, sourcing, notes |
-| Complete Due Task | "Due & Overdue Tasks" banner with inline ✅ Log / ⏭ Skip / ⏸ Pause actions per schedule |
 | Edit | Per-entry "Open ↗" → modal with form → Save Changes |
 | Delete | From inside the entry modal → two-click confirmation |
 
@@ -82,11 +82,12 @@ Full management of maintenance schedules. Schedules are normally created automat
 
 | Action | Mechanism |
 | :--- | :--- |
-| View | Grouped by device in expanders with overdue/due-soon/on-track badges |
+| View | Urgency-grouped cards: Overdue · This Week · This Month · Later · Paused. Each card shows device + task + frequency + next-due metadata with a status badge and `🗓 Synced` pill when pushed |
 | Add | "＋ Add Manual" button (manual schedule without a service type) |
+| Pause / Resume | Inline ⏸ Pause / ▶ Resume button on every row; paused schedules skipped by calendar push |
 | Edit | Per-row "Open ↗" → modal with form → Save Changes |
-| Pause / Resume | Toggled from the per-row modal; paused schedules skipped by calendar push |
 | Delete | From inside the schedule modal → two-click confirmation |
+| Export | ⬇ CSV button in the view header — downloads all schedules (active + paused) sorted by next due date |
 
 ### 4.5 Integrations
 

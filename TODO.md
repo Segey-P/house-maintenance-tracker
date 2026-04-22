@@ -1,49 +1,12 @@
 # House Maintenance Tracker — TODO
 
-## In Progress
-
-UI redesign from `design_handoff/` — see DESIGN.md for full spec.
-
-### Wave 0 — Drop-ins (done in this session)
-- [x] Theme tokens in `.streamlit/config.toml` (amber primary, warm off-white bg)
-- [x] DM Sans font + redesigned global CSS (cards, metrics, buttons, tabs)
-- [x] Rename tabs: Maintenance → History, Notifications → Integrations
-- [x] Remove "Coming Soon" block from Dashboard (moves to Roadmap view in Wave 5)
-- [x] Fix Google Calendar push crash (`dev.part_numbers` / `dev.resource_links` no longer exist on Device; pull from service type instead)
-
 ## Next Up
 
-Stack decision: **Option A** — Streamlit + `@st.dialog` modals (~80% visual parity). Archive feature stays in DB + UI (design's removal treated as a design error). Anthropic API approved for Wave 5.
+Nothing active — the UI redesign (Waves 0–4) is merged and the Schedules CSV export shipped on top. Next direction TBD by user: either re-scope Wave 5 (AI features) or pick from the Future Considerations below.
 
-### Wave 1 — Sidebar nav + shell (done)
-- [x] Replace `st.tabs` with sidebar-driven view picker (dark navy sidebar per design)
-- [x] `src/ui.py` with `status_info`, `badge_html`, `stat_card_html` helpers
-- [x] User profile + Sign out in sidebar footer
-- [x] Property switcher placeholder (static Squamish Home)
-- [x] Roadmap view stub (Phase 1/2/3 from DESIGN.md)
+## Future Considerations
 
-### Wave 2 — Dashboard refactor (done)
-- [x] 4-card tinted stat row (Overdue red, Due-this-week amber)
-- [x] Task groups (Needs Attention / Due This Week / Later This Month)
-- [x] Inline ✓ Done + ⏭ Skip + ⏸ Pause with expand-below quick-log form
-- [x] Recent Activity as card list (5 entries)
-
-### Wave 3 — Devices redesign (done)
-- [x] Card grid (3-col `st.columns` — Streamlit can't emit true CSS auto-fill)
-- [x] Accent strip + status badge + category pill + warranty-expiring badge
-- [x] Device dialog: 4-col specs row + 4-col metrics row, amber notes block
-- [x] Nested service type cards retained (cleanup deferred if needed)
-- [x] Inline delete confirmation (replaces `_delete_dialog` modal for device)
-- [x] Category spend on device cards (Total + YTD)
-- [ ] Dashed "+ Add Device" tile — deferred to Wave 6 (needs custom component)
-- Archive: keeps working in DB + UI (design's removal = design error)
-
-### Wave 4 — History + Schedules refactor (done)
-- [x] History: flat card list, date/category/from-to filters, amber due-tasks banner with chip row
-- [x] Schedules: urgency-grouped (Overdue / This Week / This Month / Later + Paused) with 🗓 Synced badge
-- [x] Inline Pause/Resume on schedule rows (new `activate_schedule` helper in scheduler.py)
-
-### Wave 5 — AI + Integrations + Roadmap (parked — needs more scoping)
+### Wave 5 — AI + Integrations polish (parked — needs more scoping)
 User flagged: think through these features in more detail before implementing. Re-open when the product spec for each is clearer.
 - [ ] Add `anthropic` to `requirements.txt`; `ANTHROPIC_API_KEY` in Streamlit secrets
 - [ ] `src/ai.py` wrapper (Claude Haiku 4.5 default; enable prompt caching on chat system context)
@@ -53,13 +16,13 @@ User flagged: think through these features in more detail before implementing. R
 - [ ] Account card (email — needs storage decision)
 - [ ] Roadmap view full polish (Phase 1/2/3 checklist from DESIGN.md — stub is live)
 
-### Wave 6 — Stretch
-- [ ] Custom slide-over panel component (true right-edge drawer)
-- [ ] Photo upload on Add Device (needs storage; Streamlit Cloud fs is ephemeral)
-- [x] Download schedule as CSV/PDF checklist (CSV ⬇ button in Schedules header)
+### Wave 6 — Stretch (parked — needs custom component or storage decision)
+- [ ] Dashed "+ Add Device" tile on the device grid (needs custom Streamlit component — `st.columns` can't emit CSS auto-fill)
+- [ ] Custom slide-over panel component (true right-edge drawer — design §2.5; currently approximated by `@st.dialog` modals)
+- [ ] Photo upload on Add Device — needs durable storage; Streamlit Cloud filesystem is ephemeral. Potential approach: S3-compatible bucket or Neon BYTEA. Ties into Phase 2 AI visual identification.
 
 ### Known UI gaps (live app)
-- [ ] **Browser-test every wave.** The fixes so far have all been pushed without a live browser verification (sandbox has no Streamlit). This already bit us twice with the sidebar/header CSS. Before merging the next wave, run `streamlit run app.py` somewhere with a browser.
+- [ ] **Browser-test every wave.** Sandbox has no Streamlit, so CSS fixes have shipped without live browser verification (this bit us twice on the sidebar/header CSS). Before merging any future wave, run `streamlit run app.py` somewhere with a browser.
 
 ## Backlog
 
@@ -71,6 +34,16 @@ User flagged: think through these features in more detail before implementing. R
 
 ## Done
 
+### UI redesign (Option A — Streamlit + `@st.dialog` modals, ~80% visual parity vs `design_handoff/`)
+- [x] Wave 0 — theme tokens, DM Sans, global CSS, tab rename (Maintenance→History, Notifications→Integrations), Google Calendar push crash fix
+- [x] Wave 1 — sidebar nav shell (dark navy, nav list, property switcher placeholder, user footer), `src/ui.py` helpers, Roadmap view stub
+- [x] Wave 2 — Dashboard tinted stat row + task groups (Needs Attention / Due This Week / Later This Month) + inline ✓ Done/⏭ Skip/⏸ Pause + quick-log form, Recent Activity card list
+- [x] Wave 3 — Devices 3-col card grid, device dialog (4-col specs + 4-col metrics + amber notes), inline delete confirmation, category spend on cards
+- [x] Wave 4 — History flat card list with filter bar + chip banner; Schedules urgency-grouped cards (Overdue/This Week/This Month/Later/Paused) with 🗓 Synced badge + inline Pause/Resume (`activate_schedule` helper)
+- [x] Hotfix — header collapse + amber `stExpandSidebarButton` pill (playwright-verified against Streamlit 1.56)
+- [x] Schedules ⬇ CSV export button in view header
+
+### Platform + data model
 - [x] Provision Neon PostgreSQL database
 - [x] Deploy to Streamlit Community Cloud (`house-maintenance-tracker.streamlit.app`)
 - [x] Add database credentials and password hash to Streamlit secrets

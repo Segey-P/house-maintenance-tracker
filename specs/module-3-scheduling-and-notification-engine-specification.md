@@ -56,13 +56,14 @@ Schedules are typically **auto-created** when a service type is added to a devic
 
 | Action | Mechanism |
 | :--- | :--- |
-| View | Device-grouped list with status badges and per-device overdue / due-soon summaries |
+| View | Urgency-grouped cards: Overdue · This Week · This Month · Later · Paused. Each card shows device + task + frequency + next-due metadata with a status badge and `🗓 Synced` pill when pushed |
 | Add | Schedules view → "＋ Add Manual" → inline form (device, task, first due date, frequency) |
 | Edit | Per-row "Open ↗" → `@st.dialog` modal → Save Changes |
-| Pause / Resume | Toggled from the schedule modal — paused schedules excluded from calendar pushes |
+| Pause / Resume | Inline ⏸ Pause / ▶ Resume button on every card — paused schedules excluded from calendar pushes |
 | Delete | From inside the schedule modal → two-click confirmation |
+| Export | ⬇ CSV button in the Schedules view header — downloads all schedules (active + paused) sorted by next due date |
 | Push Calendar | Integrations view → Push to Calendar (per device or all; force re-push option) |
-| Complete Due Task | History view → Due & Overdue Tasks banner → inline ✅ Log / ⏭ Skip / ⏸ Pause |
+| Complete Due Task | History view → Due Tasks chip banner → prefills log form + advances schedule on save |
 
 ## 7. CLI Operations
 
