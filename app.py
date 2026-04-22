@@ -964,19 +964,24 @@ elif nav == "history":
         st.session_state.show_hist_add = not st.session_state.get("show_hist_add", False)
         st.session_state.pop("prefill_log", None)
 
-    # ── Due Tasks ─────────────────────────────────────────────────────────────
+    # ── Due Tasks — amber banner with compact chip row (design §3 History) ────
     action_items = sched.get_due_schedules(days_ahead=7)
     if action_items:
-        with st.container(border=True):
-            st.markdown("**Due & Overdue Tasks**")
-            for s in action_items:
-                rc1, rc2, rc3, rc4 = st.columns([4, 1, 1, 1])
-                rc1.markdown(
-                    f"**{s.device_name}**  ·  {s.task_description}  ·  "
-                    f"<span style='font-size:0.85rem'>{_status(days_until_due(s.next_due_date))}</span>",
-                    unsafe_allow_html=True,
-                )
-                if rc2.button("✅ Log", key=f"due_log_{s.id}", use_container_width=True):
+        st.markdown(
+            "<div style='background:#fffbeb;border:1px solid #fde68a;border-left:3px solid #f59e0b;"
+            "border-radius:10px;padding:10px 14px;margin-bottom:14px'>"
+            f"<div style='font-size:13px;font-weight:700;color:#78350f;margin-bottom:8px'>"
+            f"Due & overdue ({len(action_items)}) — click a chip to prefill the log form</div>",
+            unsafe_allow_html=True,
+        )
+        per_row = 3
+        for row_start in range(0, len(action_items), per_row):
+            row = action_items[row_start:row_start + per_row]
+            cols = st.columns(per_row)
+            for col, s in zip(cols, row):
+                days = days_until_due(s.next_due_date)
+                label = f"{s.device_name} · {s.task_description} · {status_info(days)['label']}"
+                if col.button(label, key=f"due_chip_{s.id}", use_container_width=True):
                     st.session_state["prefill_log"] = {
                         "device_id": s.device_id,
                         "task": s.task_description,
@@ -985,15 +990,7 @@ elif nav == "history":
                     }
                     st.session_state.show_hist_add = True
                     st.rerun()
-                if rc3.button("⏭ Skip", key=f"due_skip_{s.id}", use_container_width=True):
-                    new_date = sched.advance_schedule(s.id)
-                    st.toast(f"Skipped — next due {new_date}", icon="⏭")
-                    st.rerun()
-                if rc4.button("⏸ Pause", key=f"due_pause_{s.id}", use_container_width=True):
-                    sched.deactivate_schedule(s.id)
-                    st.toast("Schedule paused. Re-activate from Schedules tab.", icon="⏸")
-                    st.rerun()
-        st.divider()
+        st.markdown("</div>", unsafe_allow_html=True)
 
     # ── Log Expense form ──────────────────────────────────────────────────────
     prefill           = st.session_state.get("prefill_log", {})
@@ -1077,52 +1074,71 @@ elif nav == "history":
                 st.session_state.show_hist_add = False
                 st.rerun()
 
-    # ── Log list ──────────────────────────────────────────────────────────────
-    all_devs_h   = inv.list_devices(include_archived=True)
-    dev_flt_opts = {"All devices": None} | {d.name: d.id for d in all_devs_h}
-    hf1, hf2, hf3 = st.columns([3, 1, 1])
-    dev_flt_sel  = hf1.selectbox("Device", list(dev_flt_opts.keys()),
-                                  key="hist_dev_flt", label_visibility="collapsed")
-    hist_limit   = hf2.selectbox("Show", LIMIT_OPTIONS, index=1,
-                                  key="hist_limit", label_visibility="collapsed",
-                                  format_func=lambda x: f"Last {x}")
-    flt_dev_id   = dev_flt_opts[dev_flt_sel]
-    hf3.metric("Total Spend", _money(hist.total_cost(flt_dev_id)))
+    # ── Filter bar ────────────────────────────────────────────────────────────
+    all_devs_h    = inv.list_devices(include_archived=True)
+    dev_flt_opts  = {"All devices": None} | {d.name: d.id for d in all_devs_h}
+    dev_category  = {d.id: d.category for d in all_devs_h}
 
+    hf1, hf2, hf3, hf4, hf5 = st.columns([2, 2, 2, 2, 2])
+    dev_flt_sel   = hf1.selectbox("Device", list(dev_flt_opts.keys()),
+                                   key="hist_dev_flt", label_visibility="collapsed")
+    cat_flt_sel   = hf2.selectbox("Category", ["All categories"] + CATEGORIES,
+                                   key="hist_cat_flt", label_visibility="collapsed")
+    date_from     = hf3.date_input("From", value=None, key="hist_date_from",
+                                    label_visibility="collapsed", format="YYYY-MM-DD")
+    date_to       = hf4.date_input("To", value=None, key="hist_date_to",
+                                    label_visibility="collapsed", format="YYYY-MM-DD")
+    hist_limit    = hf5.selectbox("Show", LIMIT_OPTIONS, index=1,
+                                   key="hist_limit", label_visibility="collapsed",
+                                   format_func=lambda x: f"Last {x}")
+
+    flt_dev_id = dev_flt_opts[dev_flt_sel]
     logs = hist.list_logs(device_id=flt_dev_id, limit=hist_limit)
 
-    if not logs:
-        st.info("No entries yet. Log your first maintenance expense above.")
-    else:
-        from collections import defaultdict
-        log_by_device: dict = defaultdict(list)
-        for l in logs:
-            log_by_device[l.device_name].append(l)
+    if cat_flt_sel != "All categories":
+        logs = [l for l in logs if dev_category.get(l.device_id) == cat_flt_sel]
+    if date_from:
+        logs = [l for l in logs if l.completion_date >= str(date_from)]
+    if date_to:
+        logs = [l for l in logs if l.completion_date <= str(date_to)]
 
-        for dev_name, dev_logs in log_by_device.items():
-            total_dev = sum(l.cost_cad for l in dev_logs)
-            with st.expander(
-                f"**{dev_name}** — {len(dev_logs)} entr{'y' if len(dev_logs) == 1 else 'ies'}"
-                f"  ·  {_money(total_dev)}",
-                expanded=(flt_dev_id is not None),
-            ):
-                hcols = st.columns([1, 3, 2, 1, 1])
-                for col, lbl in zip(hcols, ["Date", "Task", "Service Type", "Cost", ""]):
-                    col.markdown(
-                        f"<span style='font-size:0.75rem;text-transform:uppercase;"
-                        f"color:#64748b;font-weight:600;letter-spacing:0.05em'>{lbl}</span>",
-                        unsafe_allow_html=True,
-                    )
-                st.markdown("<hr style='margin:4px 0 8px'>", unsafe_allow_html=True)
-                for l in dev_logs:
-                    rc = st.columns([1, 3, 2, 1, 1])
-                    rc[0].caption(l.completion_date)
-                    rc[1].markdown(f"<span style='font-size:0.85rem'>{l.task_performed}</span>",
-                                   unsafe_allow_html=True)
-                    rc[2].caption(l.service_type_name or "—")
-                    rc[3].caption(_money(l.cost_cad) if l.cost_cad else "—")
-                    if rc[4].button("Open ↗", key=f"log_open_{l.id}", use_container_width=True):
-                        _log_dialog(l)
+    filtered_spend = sum(l.cost_cad for l in logs)
+    st.markdown(
+        f"<div style='display:flex;justify-content:flex-end;gap:18px;margin:6px 0 10px'>"
+        f"<div><span class='hmt-spec-label'>Entries</span> "
+        f"<span class='hmt-spec-value' style='display:inline;margin-left:4px'>{len(logs)}</span></div>"
+        f"<div><span class='hmt-spec-label'>Spend</span> "
+        f"<span class='hmt-spec-value' style='display:inline;margin-left:4px;color:#e8823a'>"
+        f"{_money(filtered_spend)}</span></div></div>",
+        unsafe_allow_html=True,
+    )
+
+    # ── Flat card list ────────────────────────────────────────────────────────
+    if not logs:
+        st.info("No entries match the current filters.")
+    else:
+        for l in logs:
+            with st.container(border=True):
+                r1, r2, r3 = st.columns([4, 2, 1])
+                r1.markdown(
+                    f"<div style='font-size:11px;color:#9ca3af;text-transform:uppercase;"
+                    f"letter-spacing:0.04em;font-weight:600'>"
+                    f"{l.completion_date}  ·  {l.device_name}</div>"
+                    f"<div style='font-size:15px;font-weight:600;color:#1c1c1e;margin-top:2px'>"
+                    f"{l.task_performed}</div>"
+                    + (f"<div style='font-size:12px;color:#6b7280;margin-top:2px'>"
+                       f"{l.service_type_name}</div>" if l.service_type_name else ""),
+                    unsafe_allow_html=True,
+                )
+                r2.markdown(
+                    f"<div style='text-align:right'>"
+                    f"<div class='hmt-spec-label'>Cost</div>"
+                    f"<div class='hmt-spec-value' style='color:#e8823a'>"
+                    f"{_money(l.cost_cad) if l.cost_cad else '—'}</div></div>",
+                    unsafe_allow_html=True,
+                )
+                if r3.button("Open ↗", key=f"log_open_{l.id}", use_container_width=True):
+                    _log_dialog(l)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1180,43 +1196,66 @@ elif nav == "schedules":
     if not all_scheds:
         st.info("No schedules yet. Add service types to a device to create schedules automatically.")
     else:
-        # Group by device
-        from collections import defaultdict
-        by_device: dict = defaultdict(list)
+        # Urgency buckets (design §3 — Overdue / This Week / This Month / Later)
+        buckets: dict[str, list] = {"Overdue": [], "This Week": [], "This Month": [], "Later": [], "Paused": []}
         for s in all_scheds:
-            by_device[s.device_name].append(s)
+            if not s.is_active:
+                buckets["Paused"].append(s)
+                continue
+            d = days_until_due(s.next_due_date)
+            if d < 0:       buckets["Overdue"].append(s)
+            elif d <= 7:    buckets["This Week"].append(s)
+            elif d <= 30:   buckets["This Month"].append(s)
+            else:           buckets["Later"].append(s)
 
-        for dev_name, dev_scheds in by_device.items():
-            overdue_cnt = sum(1 for s in dev_scheds if days_until_due(s.next_due_date) < 0)
-            due_soon_cnt = sum(1 for s in dev_scheds if 0 <= days_until_due(s.next_due_date) <= 7)
-            if overdue_cnt:
-                badge = f"⛔ {overdue_cnt} overdue"
-            elif due_soon_cnt:
-                badge = f"🟡 {due_soon_cnt} due this week"
-            else:
-                badge = "🟢 on track"
-            with st.expander(f"**{dev_name}** — {len(dev_scheds)} schedule(s) · {badge}",
-                             expanded=bool(overdue_cnt)):
-                hcols = st.columns([3, 1, 1, 1])
-                for col, lbl in zip(hcols, ["Task", "Next Due", "Status", ""]):
-                    col.markdown(
-                        f"<span style='font-size:0.75rem;text-transform:uppercase;"
-                        f"color:#64748b;font-weight:600;letter-spacing:0.05em'>{lbl}</span>",
+        for bucket in ("Overdue", "This Week", "This Month", "Later", "Paused"):
+            rows = sorted(buckets[bucket], key=lambda s: days_until_due(s.next_due_date))
+            if not rows:
+                continue
+            st.markdown(
+                f"<h4 style='margin:18px 0 10px;color:#1c1c1e;font-size:14px;"
+                f"text-transform:uppercase;letter-spacing:0.06em;font-weight:700;'>"
+                f"{bucket}  <span style='color:#9ca3af;font-weight:500'>({len(rows)})</span></h4>",
+                unsafe_allow_html=True,
+            )
+            for s in rows:
+                days = days_until_due(s.next_due_date)
+                sinfo = status_info(days) if s.is_active else {"status": "neutral", "label": "Paused"}
+                with st.container(border=True):
+                    r1, r2 = st.columns([5, 3])
+                    r1.markdown(
+                        f"<div style='font-size:11px;color:#9ca3af;text-transform:uppercase;"
+                        f"letter-spacing:0.04em;font-weight:600'>{s.device_name}</div>"
+                        f"<div style='font-size:15px;font-weight:600;color:#1c1c1e;margin-top:2px'>"
+                        f"{s.task_description}</div>"
+                        f"<div style='font-size:12px;color:#6b7280;margin-top:2px'>"
+                        f"Every {_freq(s.frequency_days)} · Next {s.next_due_date}</div>",
                         unsafe_allow_html=True,
                     )
-                st.markdown("<hr style='margin:4px 0 8px'>", unsafe_allow_html=True)
-                for s in dev_scheds:
-                    rc = st.columns([3, 1, 1, 1])
-                    task_label = s.task_description
-                    if not s.is_active:
-                        task_label = f"⏸ {task_label}"
-                    rc[0].markdown(task_label)
-                    rc[1].markdown(f"<span style='font-size:0.85rem'>{s.next_due_date}</span>",
-                                   unsafe_allow_html=True)
-                    rc[2].markdown(f"<span style='font-size:0.85rem'>"
-                                   f"{_status(days_until_due(s.next_due_date))}</span>",
-                                   unsafe_allow_html=True)
-                    if rc[3].button("Open ↗", key=f"sched_open_{s.id}", use_container_width=True):
+                    pills = [badge_html(sinfo["status"], sinfo["label"])]
+                    if s.calendar_event_id:
+                        pills.append(badge_html("blue", "🗓 Synced"))
+                    r2.markdown(
+                        "<div style='text-align:right;display:flex;justify-content:flex-end;"
+                        "flex-wrap:wrap;gap:6px'>" + "".join(pills) + "</div>",
+                        unsafe_allow_html=True,
+                    )
+
+                    b1, b2, _pad = st.columns([1, 1, 3])
+                    if s.is_active:
+                        if b1.button("⏸ Pause", key=f"sched_pause_{s.id}",
+                                     use_container_width=True):
+                            sched.deactivate_schedule(s.id)
+                            st.toast("Schedule paused.", icon="⏸")
+                            st.rerun()
+                    else:
+                        if b1.button("▶ Resume", key=f"sched_resume_{s.id}",
+                                     use_container_width=True):
+                            sched.activate_schedule(s.id)
+                            st.toast("Schedule resumed.", icon="▶")
+                            st.rerun()
+                    if b2.button("Open ↗", key=f"sched_open_{s.id}",
+                                 use_container_width=True):
                         _schedule_dialog(s)
 
 
