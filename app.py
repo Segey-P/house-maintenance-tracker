@@ -41,14 +41,32 @@ html, body, [class*="st-"], button, input, textarea, select {
     font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif !important;
 }
 
-/* Hide Streamlit chrome — keep the sidebar-toggle button (lives in the
-   header) visible so users can reopen a collapsed sidebar */
-#MainMenu, footer { visibility: hidden; }
-header [data-testid="stToolbar"],
-header [data-testid="stDecoration"],
-header [data-testid="stStatusWidget"] { visibility: hidden; }
-header { background: transparent; }
+/* Remove Streamlit top chrome. `display: none` (not `visibility: hidden`) so
+   the header stops reserving space — previously the invisible sticky header
+   was clipping the top of the content below. */
+header, footer { display: none !important; }
+#MainMenu { visibility: hidden; }
 .block-container { padding-top: 1.5rem; padding-bottom: 2rem; max-width: 1100px; }
+
+/* Sidebar-expand chevron (shown when the sidebar is collapsed). Style it as
+   an amber pill so it's always findable on any background, regardless of
+   which Streamlit version renders it inside or outside the header. */
+button[data-testid="stSidebarCollapsedControl"],
+[data-testid="stSidebarCollapsedControl"],
+button[kind="headerNoPadding"][data-testid*="Collapsed"] {
+    background: #e8823a !important;
+    color: #ffffff !important;
+    border: 1px solid #d4722f !important;
+    border-radius: 8px !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.14) !important;
+    top: 12px !important; left: 12px !important;
+    padding: 6px 10px !important;
+    z-index: 999 !important;
+}
+[data-testid="stSidebarCollapsedControl"] svg,
+button[data-testid="stSidebarCollapsedControl"] svg {
+    color: #ffffff !important; fill: #ffffff !important; stroke: #ffffff !important;
+}
 
 /* Headings */
 h1, h2, h3 { color: #1c1c1e; letter-spacing: -0.01em; }
@@ -123,17 +141,21 @@ div[data-testid="stVerticalBlockBorderWrapper"] {
     box-shadow: 0 1px 4px rgba(0,0,0,0.04);
 }
 
-/* Sidebar — dark navy per design §2.1 */
+/* Sidebar — dark navy per design §2.1. Width left at the Streamlit default
+   so the collapse animation behaves correctly (hard-coding it previously
+   interfered with the open/closed transition). */
 section[data-testid="stSidebar"] {
     background: #13192b !important;
     border-right: 1px solid #1e2a42;
-    width: 220px !important;
-    min-width: 220px !important;
 }
 section[data-testid="stSidebar"] > div { padding-top: 8px; }
 section[data-testid="stSidebar"] * { color: #e2e8f0; }
 section[data-testid="stSidebar"] hr,
 section[data-testid="stSidebar"] [data-testid="stHorizontalRule"] { border-color: #1e2a42 !important; background: #1e2a42 !important; }
+/* Collapse-sidebar (X) button inside the expanded sidebar */
+section[data-testid="stSidebar"] [data-testid="stSidebarCollapseButton"] svg {
+    fill: #e2e8f0 !important; stroke: #e2e8f0 !important;
+}
 
 /* Sidebar buttons — nav items */
 section[data-testid="stSidebar"] .stButton > button {
