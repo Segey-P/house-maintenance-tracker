@@ -43,19 +43,23 @@ Stack decision: **Option A** — Streamlit + `@st.dialog` modals (~80% visual pa
 - [x] Schedules: urgency-grouped (Overdue / This Week / This Month / Later + Paused) with 🗓 Synced badge
 - [x] Inline Pause/Resume on schedule rows (new `activate_schedule` helper in scheduler.py)
 
-### Wave 5 — AI + Integrations + Roadmap
+### Wave 5 — AI + Integrations + Roadmap (parked — needs more scoping)
+User flagged: think through these features in more detail before implementing. Re-open when the product spec for each is clearer.
 - [ ] Add `anthropic` to `requirements.txt`; `ANTHROPIC_API_KEY` in Streamlit secrets
 - [ ] `src/ai.py` wrapper (Claude Haiku 4.5 default; enable prompt caching on chat system context)
-- [ ] Find Parts + Find Tutorial buttons on each service type card
-- [ ] Dashboard AI Chat widget (context: devices, overdue, due-this-week)
+- [ ] Find Parts + Find Tutorial buttons on each service type card — open questions: how specific can Haiku be on Canadian part SKUs? do we surface Amazon.ca referral links?
+- [ ] Dashboard AI Chat widget (context: devices, overdue, due-this-week) — open questions: context window budget, cache strategy, how chatty is useful vs. noise
 - [ ] Integrations: Connect/Disconnect pill + Synced/Unsynced tile counts
 - [ ] Account card (email — needs storage decision)
-- [ ] Roadmap view (Phase 1/2/3 checklist from DESIGN.md)
+- [ ] Roadmap view full polish (Phase 1/2/3 checklist from DESIGN.md — stub is live)
 
 ### Wave 6 — Stretch
 - [ ] Custom slide-over panel component (true right-edge drawer)
 - [ ] Photo upload on Add Device (needs storage; Streamlit Cloud fs is ephemeral)
 - [ ] Download schedule as CSV/PDF checklist
+
+### Known UI gaps (live app)
+- [ ] **Browser-test every wave.** The fixes so far have all been pushed without a live browser verification (sandbox has no Streamlit). This already bit us twice with the sidebar/header CSS. Before merging the next wave, run `streamlit run app.py` somewhere with a browser.
 
 ## Backlog
 
