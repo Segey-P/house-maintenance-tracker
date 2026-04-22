@@ -38,10 +38,10 @@ Stack decision: **Option A** — Streamlit + `@st.dialog` modals (~80% visual pa
 - [ ] Dashed "+ Add Device" tile — deferred to Wave 6 (needs custom component)
 - Archive: keeps working in DB + UI (design's removal = design error)
 
-### Wave 4 — History + Schedules refactor
-- [ ] History: flat card list, date/category/from-to filters, amber due-tasks banner with chip row
-- [ ] Schedules: urgency-grouped (Overdue / This Week / This Month / Later) with 🗓 Synced badge
-- [ ] Inline Pause/Resume on schedule rows
+### Wave 4 — History + Schedules refactor (done)
+- [x] History: flat card list, date/category/from-to filters, amber due-tasks banner with chip row
+- [x] Schedules: urgency-grouped (Overdue / This Week / This Month / Later + Paused) with 🗓 Synced badge
+- [x] Inline Pause/Resume on schedule rows (new `activate_schedule` helper in scheduler.py)
 
 ### Wave 5 — AI + Integrations + Roadmap
 - [ ] Add `anthropic` to `requirements.txt`; `ANTHROPIC_API_KEY` in Streamlit secrets

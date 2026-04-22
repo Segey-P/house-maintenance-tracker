@@ -93,5 +93,10 @@ def deactivate_schedule(schedule_id: int) -> None:
         conn.execute("UPDATE schedules SET is_active = 0 WHERE id = %s", (schedule_id,))
 
 
+def activate_schedule(schedule_id: int) -> None:
+    with get_connection() as conn:
+        conn.execute("UPDATE schedules SET is_active = 1 WHERE id = %s", (schedule_id,))
+
+
 def days_until_due(next_due_date: str) -> int:
     return (date.fromisoformat(next_due_date) - date.today()).days
