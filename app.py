@@ -31,8 +31,6 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-require_password()
-
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700;800&display=swap');
@@ -41,30 +39,39 @@ html, body, [class*="st-"], button, input, textarea, select {
     font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif !important;
 }
 
-/* Remove Streamlit top chrome. `display: none` (not `visibility: hidden`) so
-   the header stops reserving space — previously the invisible sticky header
-   was clipping the top of the content below. */
-header, footer { display: none !important; }
-#MainMenu { visibility: hidden; }
+/* Remove Streamlit chrome. We can't `display: none` the header because
+   the sidebar-expand button lives inside it — so shrink the header to 0
+   height with overflow:visible, then hide the unwanted children. */
+[data-testid="stHeader"] {
+    height: 0 !important; min-height: 0 !important;
+    background: transparent !important; border: none !important;
+    box-shadow: none !important; overflow: visible !important;
+}
+[data-testid="stHeader"] [data-testid="stMainMenu"],
+[data-testid="stHeader"] [data-testid="stStatusWidget"],
+[data-testid="stHeader"] [data-testid="stToolbarActions"],
+[data-testid="stHeader"] [data-testid="stAppDeployButton"] {
+    display: none !important;
+}
+footer { display: none !important; }
 .block-container { padding-top: 1.5rem; padding-bottom: 2rem; max-width: 1100px; }
 
-/* Sidebar-expand chevron (shown when the sidebar is collapsed). Style it as
-   an amber pill so it's always findable on any background, regardless of
-   which Streamlit version renders it inside or outside the header. */
-button[data-testid="stSidebarCollapsedControl"],
-[data-testid="stSidebarCollapsedControl"],
-button[kind="headerNoPadding"][data-testid*="Collapsed"] {
+/* Sidebar-expand button (renders inside the header when the sidebar is
+   collapsed). Position it absolutely so the 0-height header doesn't clip
+   it above the viewport, and paint it as an amber pill. */
+[data-testid="stExpandSidebarButton"] {
+    position: fixed !important;
+    top: 12px !important; left: 12px !important;
     background: #e8823a !important;
     color: #ffffff !important;
     border: 1px solid #d4722f !important;
     border-radius: 8px !important;
     box-shadow: 0 2px 8px rgba(0,0,0,0.14) !important;
-    top: 12px !important; left: 12px !important;
-    padding: 6px 10px !important;
+    padding: 4px 10px !important;
     z-index: 999 !important;
 }
-[data-testid="stSidebarCollapsedControl"] svg,
-button[data-testid="stSidebarCollapsedControl"] svg {
+[data-testid="stExpandSidebarButton"] *,
+[data-testid="stExpandSidebarButton"] svg {
     color: #ffffff !important; fill: #ffffff !important; stroke: #ffffff !important;
 }
 
@@ -249,6 +256,8 @@ section[data-testid="stSidebar"] .stButton > button[kind="primary"] {
 }
 </style>
 """, unsafe_allow_html=True)
+
+require_password()
 
 init_db()
 
