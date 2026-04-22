@@ -41,8 +41,13 @@ html, body, [class*="st-"], button, input, textarea, select {
     font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif !important;
 }
 
-/* Hide Streamlit chrome */
-#MainMenu, header, footer { visibility: hidden; }
+/* Hide Streamlit chrome — keep the sidebar-toggle button (lives in the
+   header) visible so users can reopen a collapsed sidebar */
+#MainMenu, footer { visibility: hidden; }
+header [data-testid="stToolbar"],
+header [data-testid="stDecoration"],
+header [data-testid="stStatusWidget"] { visibility: hidden; }
+header { background: transparent; }
 .block-container { padding-top: 1.5rem; padding-bottom: 2rem; max-width: 1100px; }
 
 /* Headings */
