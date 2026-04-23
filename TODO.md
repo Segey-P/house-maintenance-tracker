@@ -1,8 +1,18 @@
 # House Maintenance Tracker — TODO
 
-## Next Up
+## Top 10 Prioritized Tasks
+1. [ ] **Bug Fix (App Access):** Diagnose why the web UI cannot be opened in incognito windows
+2. [ ] **Bug Fix (Project Details):** Fix project details page refresh-loop issue
+3. [ ] **Cross-Browser Testing:** Perform full manual testing of CSS on Streamlit Cloud
+4. [ ] **AI Scoping:** Detail the `src/ai.py` wrapper and prompt caching strategy
+5. [ ] **Integration Scoping:** Define the specific Canadian part SKU logic for AI lookup
+6. [ ] **Integrations UI:** Implement Connect/Disconnect pills for scheduled tasks
+7. [ ] **Schedules UI:** Finalize the roadmap view checklist in `src/ui.py`
+8. [ ] **Storage Decision:** Decide on durable storage for photo uploads (S3 vs. Neon BYTEA)
+9. [ ] **UI Component:** Build dashed "+ Add Device" tile for the device grid
+10. [ ] **Refactor Backend:** Plan unified `tasks` table (schedules + history combined)
 
-Nothing active — the UI redesign (Waves 0–4) is merged and the Schedules CSV export shipped on top. Next direction TBD by user: either re-scope Wave 5 (AI features) or pick from the Future Considerations below.
+---
 
 ## Future Considerations
 
