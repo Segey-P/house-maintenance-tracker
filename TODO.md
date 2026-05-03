@@ -28,3 +28,25 @@
 - [ ] IoT device detection integration
 - [ ] Auto-order replacement parts from Amazon
 - [ ] Unified `tasks` table (v2 backend refactor)
+- [ ] multi-user experience
+- [ ] Secure User Authentication: Private sign-up/login for neighbors using Supabase Auth.
+
+Master Building Blueprint: A central library of pre-defined maintenance tasks specific to your building's infrastructure.
+
+One-Click Import: A feature allowing neighbors to instantly copy the master blueprint into their private personal dashboard.
+
+Dynamic Due-Date Calculator: Automated reminders based on the last date a task (like an HRV filter change) was completed.
+
+Parts & Specs Wiki: A shared directory of exact filter sizes, lightbulb types, and battery models used throughout the 100 units.
+
+Vetted Contractor Directory: A list of plumbers and electricians who have successfully performed work in the building.
+
+Service Expense Tracker: A log to record costs of repairs for investment tracking or potential tax deductions.
+
+Home Health PDF Generator: A one-button export of all maintenance history to show prospective buyers during a resale.
+
+Photo Evidence Log: Cloud storage for uploading photos of receipts and "before/after" shots of serviced equipment.
+
+Retail Quick-Links: Direct links to Canadian retailers (Home Depot, Amazon) for the specific parts listed in the specs.
+
+Building-Wide Alerts: A shared calendar for annual inspections, fire alarm testing, or scheduled water shut-offs.
